@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/SNS-for-Visual-Motion-Processing.iml" filepath="$PROJECT_DIR$/.idea/SNS-for-Visual-Motion-Processing.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../SNSTorch/.idea/SNSTorch.iml" filepath="$PROJECT_DIR$/../SNSTorch/.idea/SNSTorch.iml" />
+    </modules>
+  </component>
+</project>
