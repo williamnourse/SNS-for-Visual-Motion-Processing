@@ -3,5 +3,6 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../SNSTorch" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../flywheel-rotation-dataset" vcs="Git" />
   </component>
 </project>

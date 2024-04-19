@@ -2,10 +2,11 @@ from snstorch import modules as m
 import torch
 import torch.nn as nn
 import numpy as np
-import torch.autograd.profiler as profiler
+from torch.utils.data import Dataset, DataLoader
 from typing import List
 import torch.jit as jit
 import math
+from motion_data import ClipDataset
 
 def __calc_cap_from_cutoff__(cutoff):
     cap = 1000/(2*np.pi*cutoff)
@@ -102,11 +103,19 @@ class SNSBandpass(nn.Module):
         return state_input, state_fast, state_slow, state_output
 
     # @jit.export
-    def init(self):
-        state_input =  torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['input_init']
-        state_fast =   torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['fast_init']
-        state_slow =   torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['slow_init']
-        state_output = torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['output_init']
+    def init(self, batch_size=None):
+        if batch_size is None:
+            state_input =  torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['input_init']
+            state_fast =   torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['fast_init']
+            state_slow =   torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['slow_init']
+            state_output = torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['output_init']
+        else:
+            batch_shape = self.shape.copy()
+            batch_shape.insert(0,batch_size)
+            state_input = torch.zeros(batch_shape, dtype=self.dtype, device=self.device) + self.params['input_init']
+            state_fast = torch.zeros(batch_shape, dtype=self.dtype, device=self.device) + self.params['fast_init']
+            state_slow = torch.zeros(batch_shape, dtype=self.dtype, device=self.device) + self.params['slow_init']
+            state_output = torch.zeros(batch_shape, dtype=self.dtype, device=self.device) + self.params['output_init']
         return state_input, state_fast, state_slow, state_output
 
     # @jit.export
@@ -1855,11 +1864,11 @@ class VisionNet(nn.Module):
 
         self.setup()
 
-    def forward(self, x, state_input, state_bo_input, state_bo_fast, state_bo_slow, state_bo_output, state_lowpass,
-                state_bf_input, state_bf_fast, state_bf_slow, state_bf_output, state_enhance_on, state_direct_on,
-                state_suppress_on, state_enhance_off, state_direct_off, state_suppress_off, state_ccw_on, state_cw_on,
-                state_ccw_off, state_cw_off, state_hc):
-
+    def forward(self, x, states):
+        [state_input, state_bo_input, state_bo_fast, state_bo_slow, state_bo_output, state_lowpass, state_bf_input,
+         state_bf_fast, state_bf_slow, state_bf_output, state_enhance_on, state_direct_on, state_suppress_on,
+         state_enhance_off, state_direct_off, state_suppress_off, state_ccw_on, state_cw_on, state_ccw_off,
+         state_cw_off, state_hc] = states
         """
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         SYNAPTIC UPDATES
@@ -1889,10 +1898,10 @@ class VisionNet(nn.Module):
         syn_direct_off_cw_off = self.syn_direct_off_off(state_direct_off, state_cw_off)
         syn_suppress_off_cw_off = self.syn_suppress_off_cw_off(state_suppress_off, state_cw_off)
         # Lobula -> Lobula Plate
-        syn_on_cw_hc = self.syn_on_cw(state_cw_on.flatten(), state_hc)
-        syn_on_ccw_hc = self.syn_on_ccw(state_ccw_on.flatten(), state_hc)
-        syn_off_cw_hc = self.syn_off_cw(state_cw_off.flatten(), state_hc)
-        syn_off_ccw_hc = self.syn_off_ccw(state_ccw_off.flatten(), state_hc)
+        syn_on_cw_hc = self.syn_on_cw(state_cw_on.flatten(start_dim=1, end_dim=-1), state_hc)
+        syn_on_ccw_hc = self.syn_on_ccw(state_ccw_on.flatten(start_dim=1, end_dim=-1), state_hc)
+        syn_off_cw_hc = self.syn_off_cw(state_cw_off.flatten(start_dim=1, end_dim=-1), state_hc)
+        syn_off_ccw_hc = self.syn_off_ccw(state_ccw_off.flatten(start_dim=1, end_dim=-1), state_hc)
 
         """
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1923,36 +1932,59 @@ class VisionNet(nn.Module):
         # Lobula Plate
         state_hc = self.hc(syn_on_cw_hc+syn_on_ccw_hc+syn_off_cw_hc+syn_off_ccw_hc, state_hc)
 
-        return (state_input, state_bo_input, state_bo_fast, state_bo_slow, state_bo_output, state_lowpass,
+        return [state_input, state_bo_input, state_bo_fast, state_bo_slow, state_bo_output, state_lowpass,
                 state_bf_input, state_bf_fast, state_bf_slow, state_bf_output, state_enhance_on, state_direct_on,
                 state_suppress_on, state_enhance_off, state_direct_off, state_suppress_off, state_ccw_on, state_cw_on,
-                state_ccw_off, state_cw_off, state_hc)
+                state_ccw_off, state_cw_off, state_hc]
 
-    def init(self):
+    def init(self, batch_size=None):
         """
         Get all initial states
         :return:
         """
-        state_input = self.input.params['init']
-        state_bo_input, state_bo_fast, state_bo_slow, state_bo_output = self.bandpass_on.init()
-        state_lowpass = self.lowpass.params['init']
-        state_bf_input, state_bf_fast, state_bf_slow, state_bf_output = self.bandpass_off.init()
-        state_enhance_on = self.enhance_on.params['init']
-        state_direct_on = self.direct_on.params['init']
-        state_suppress_on = self.suppress_on.params['init']
-        state_enhance_off = self.enhance_off.params['init']
-        state_direct_off = self.direct_off.params['init']
-        state_suppress_off = self.suppress_off.params['init']
-        state_ccw_on = self.ccw_on.params['init']
-        state_cw_on = self.cw_on.params['init']
-        state_ccw_off = self.ccw_off.params['init']
-        state_cw_off = self.cw_off.params['init']
-        state_hc = self.hc.params['init']
+        if batch_size is None:
+            state_input = self.input.params['init']
+            state_bo_input, state_bo_fast, state_bo_slow, state_bo_output = self.bandpass_on.init()
+            state_lowpass = self.lowpass.params['init']
+            state_bf_input, state_bf_fast, state_bf_slow, state_bf_output = self.bandpass_off.init()
+            state_enhance_on = self.enhance_on.params['init']
+            state_direct_on = self.direct_on.params['init']
+            state_suppress_on = self.suppress_on.params['init']
+            state_enhance_off = self.enhance_off.params['init']
+            state_direct_off = self.direct_off.params['init']
+            state_suppress_off = self.suppress_off.params['init']
+            state_ccw_on = self.ccw_on.params['init']
+            state_cw_on = self.cw_on.params['init']
+            state_ccw_off = self.ccw_off.params['init']
+            state_cw_off = self.cw_off.params['init']
+            state_hc = self.hc.params['init']
+        else:
+            batch_shape_input = self.shape_input.copy()
+            batch_shape_input.insert(0,batch_size)
+            batch_shape_post_conv = self.shape_post_conv.copy()
+            batch_shape_post_conv.insert(0,batch_size)
+            batch_shape_emd = self.shape_emd.copy()
+            batch_shape_emd.insert(0, batch_size)
+            state_input = self.input.params['init'] + torch.zeros(batch_shape_input, dtype=self.dtype, device=self.device)
+            state_bo_input, state_bo_fast, state_bo_slow, state_bo_output = self.bandpass_on.init(batch_size=batch_size)
+            state_lowpass = self.lowpass.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_bf_input, state_bf_fast, state_bf_slow, state_bf_output = self.bandpass_off.init(batch_size=batch_size)
+            state_enhance_on = self.enhance_on.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_direct_on = self.direct_on.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_suppress_on = self.suppress_on.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_enhance_off = self.enhance_off.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_direct_off = self.direct_off.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_suppress_off = self.suppress_off.params['init'] + torch.zeros(batch_shape_post_conv, dtype=self.dtype, device=self.device)
+            state_ccw_on = self.ccw_on.params['init'] + torch.zeros(batch_shape_emd, dtype=self.dtype, device=self.device)
+            state_cw_on = self.cw_on.params['init'] + torch.zeros(batch_shape_emd, dtype=self.dtype, device=self.device)
+            state_ccw_off = self.ccw_off.params['init'] + torch.zeros(batch_shape_emd, dtype=self.dtype, device=self.device)
+            state_cw_off = self.cw_off.params['init'] + torch.zeros(batch_shape_emd, dtype=self.dtype, device=self.device)
+            state_hc = self.hc.params['init'] + torch.zeros([batch_size,2], dtype=self.dtype, device=self.device)
 
-        return (state_input, state_bo_input, state_bo_fast, state_bo_slow, state_bo_output, state_lowpass,
+        return [state_input, state_bo_input, state_bo_fast, state_bo_slow, state_bo_output, state_lowpass,
                 state_bf_input, state_bf_fast, state_bf_slow, state_bf_output, state_enhance_on, state_direct_on,
                 state_suppress_on, state_enhance_off, state_direct_off, state_suppress_off, state_ccw_on, state_cw_on,
-                state_ccw_off, state_cw_off, state_hc)
+                state_ccw_off, state_cw_off, state_hc]
 
     def setup(self):
         """Lamina"""
@@ -2459,7 +2491,51 @@ class VisionNet(nn.Module):
         self.syn_off_cw.params.update(syn_off_cw_ex_ccw_in_params)
         self.syn_off_ccw.params.update(syn_off_cw_in_ccw_ex_params)
 
+class NetHandler(nn.Module):
+    def __init__(self, net, dt, shape_input, shape_field, **kwargs):
+        super().__init__()
+        self.net = net(dt, shape_input, shape_field, **kwargs)
+
+    def init(self, batch_size=None):
+        states = self.net.init(batch_size=batch_size)
+        return states
+
+    def setup(self):
+        self.net.setup()
+
+    def forward(self, X, states):
+        # transforms X to dimensions: n_steps X batch_size X n_inputs
+        # raw: batch_size X n_steps X n_rows X n_cols
+        X = X.permute(1, 0, 2, 3)
+
+        self.batch_size = X.size(1)
+        self.n_steps = X.size(0)
+
+        # rnn_out => n_steps, batch_size, n_neurons (hidden states for each time step)
+        # self.hidden => 1, batch_size, n_neurons (final state from each rnn_out)
+        running_ccw = torch.zeros(self.batch_size, dtype=self.net.dtype, device=self.net.device)
+        step = 0
+        while step < 400:
+            states = self.net(X[0, :, :, :], states)
+            step += 1
+        for i in range(self.n_steps):
+            states = self.net(X[i,:,:, :], states)
+            running_ccw += states[-1][:,1]
+            # print(ext+prev)
+
+        # print(out)
+        return running_ccw/i  # batch_size X n_output
 
 if __name__ == "__main__":
     img_size = [24,64]
-    print(VisionNet(((1/30)/13)*1000, img_size, 5))
+    train = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTrain3s')
+    sample_img, sample_label = train[0]
+    print(train.__len__())
+    print(sample_img.shape, sample_label)
+
+    train_dataloader = DataLoader(train, batch_size=1, shuffle=True)
+    imgs, labels = next(iter(train_dataloader))
+    handler = NetHandler(VisionNet, ((1/30)/13)*1000, img_size, 5)
+    states = handler.init()
+    out = handler(imgs, states)
+    print(out)
