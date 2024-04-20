@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 start = time.time()
 N_STEPS = 90
-BATCH_SIZE = 15
+BATCH_SIZE = 24
 N_EPOCHS = 50
 DT = ((1/30)/13)*1000
 IMG_SIZE = [24,64]
@@ -49,64 +49,68 @@ for r in range(N_SEEDS):
     loss_test_history = []
     # for epoch in range(N_EPOCHS):  # loop over the dataset multiple times
     epoch = 0
-    while test_loss <= test_loss_last or epoch <= N_EPOCHS:
+    while test_loss < test_loss_last or epoch <= N_EPOCHS:
         train_running_loss = 0.0
         train_acc = 0.0
-        model.train()
-        # zero the parameter gradients
-        optimizer.zero_grad()
+        with torch.enable_grad():
+            model.train()
+            # zero the parameter gradients
+            optimizer.zero_grad()
 
-        # TRAINING ROUND
-        for i, data in enumerate(tqdm(train_dataloader)):
-            # print(i)
-            # get the inputs
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            targets = vel_to_state(labels).type(model.net.dtype)
-            outputs = torch.zeros_like(targets)
-            # inputs = inputs.view(-1, 28, 28)
+            # TRAINING ROUND
+            for i, data in enumerate(tqdm(train_dataloader)):
+                # print(i)
+                # get the inputs
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+                targets = vel_to_state(labels).type(model.net.dtype)
+                outputs = torch.zeros_like(targets)
+                # inputs = inputs.view(-1, 28, 28)
 
-            model.setup()
-            # for j in range(BATCH_SIZE):
-            states = model.init(BATCH_SIZE)
-            outputs = model(inputs, states)
-            # reset hidden states
-            states = model.init(BATCH_SIZE)
+                model.setup()
+                # for j in range(BATCH_SIZE):
+                states = model.init(inputs.shape[0])
+                outputs = model(inputs, states)
+                # reset hidden states
+                # states = model.init(BATCH_SIZE)
 
-            loss = criterion(outputs, targets)
-            loss.backward()
-            optimizer.step()
+                loss = criterion(outputs, targets)
+                loss.backward()
+                optimizer.step()
 
-            train_running_loss += loss.detach().item()
+                train_running_loss += loss.detach().item()
 
-            if i%LOG_INTERVAL==0:
-                print('Run: %i | Epoch:  %d | Batch: %i | Loss: %.4f | Time: %i secs'
-              % (r, epoch, i, train_running_loss / (i+1), time.time()-start))
+            # if i%LOG_INTERVAL==0:
+            #     print('Run: %i | Epoch:  %d | Batch: %i | Loss: %.4f | Time: %i secs'
+            #   % (r, epoch, i, train_running_loss / (i+1), time.time()-start))
 
         model.eval()
         print('Run: %i | Epoch:  %d | Loss: %.4f | Time: %i secs' % (r, epoch, train_running_loss / (i+1), time.time()-start))
         loss_history.extend([train_running_loss/(i+1)])
         test_loss_last = test_loss
         test_loss = 0.0
-        model.setup()
-        for i, data in enumerate(test_dataloader, 0):
-            inputs, labels = data
-            inputs, labels = inputs.to(device), labels.to(device)
-            targets = vel_to_state(labels)
-            # inputs = inputs.view(-1, 28, 28)
-            states = model.init(BATCH_SIZE)
+        with torch.no_grad():
+            model.setup()
+            # optimizer.zero_grad()
+            for i, data in enumerate(tqdm(test_dataloader)):
+                inputs, labels = data
+                inputs, labels = inputs.to(device), labels.to(device)
+                targets = vel_to_state(labels).type(model.net.dtype)
+                # outputs = torch.zeros_like(targets)
+                # inputs = inputs.view(-1, 28, 28)
+                states = model.init(inputs.shape[0])
 
-            output = model(inputs, states)
-
-            test_loss += criterion(output, targets)
-        loss_test_history.extend([test_loss/(i+1)])
+                outputs = model(inputs, states)
+                placeholder = criterion(outputs, targets)
+                test_loss += placeholder.detach().item()
+            loss_test_history.extend([test_loss/(i+1)])
         epoch += 1
 
-        print('Test Accuracy: %.2f' % (test_loss / (i+1)))
-        torch.save(model.state_dict(),'CHECKPT-'+datetime.now().strftime('%d-%m-%Y-%H-%M-%S')+'.pt')
+        print('Test Loss: %.4f | Time: %i secs' % (test_loss / (i+1), time.time()-start))
+        torch.save(model.state_dict(),'CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
 
-    save_data = {'loss': loss_history, 'lossTest': loss_test_history}
-    pickle.dump(save_data, open('SNS-'+datetime.now().strftime('%d-%m-%Y-%H-%M-%S')+'.p', 'wb'))
+        save_data = {'loss': loss_history, 'lossTest': loss_test_history}
+        pickle.dump(save_data, open('LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
 
     plt.figure()
     plt.subplot(2,1,1)
