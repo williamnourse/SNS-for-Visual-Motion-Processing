@@ -2154,6 +2154,7 @@ class VisionNet(nn.Module):
             'reversal': self.params['reversalEx']
         })
         self.syn_lowpass_enhance_on.params.update(syn_l_eo_params)
+        self.syn_lowpass_enhance_on.setup()
         tau_eo = self.params['ratioTauEO']*self.tau_fast
         nrn_eo_params = nn.ParameterDict({
             'tau': nn.Parameter(
@@ -2514,6 +2515,7 @@ class NetHandler(nn.Module):
         # rnn_out => n_steps, batch_size, n_neurons (hidden states for each time step)
         # self.hidden => 1, batch_size, n_neurons (final state from each rnn_out)
         running_ccw = torch.zeros(self.batch_size, dtype=self.net.dtype, device=self.net.device)
+        running_cw = torch.zeros(self.batch_size, dtype=self.net.dtype, device=self.net.device)
         step = 0
         while step < 400:
             states = self.net(X[0, :, :, :], states)
@@ -2521,10 +2523,11 @@ class NetHandler(nn.Module):
         for i in range(self.n_steps):
             states = self.net(X[i,:,:, :], states)
             running_ccw += states[-1][:,1]
+            running_cw += states[-1][:, 0]
             # print(ext+prev)
 
         # print(out)
-        return running_ccw/i  # batch_size X n_output
+        return running_ccw/i, running_cw/i  # batch_size X n_output
 
 if __name__ == "__main__":
     img_size = [24,64]
