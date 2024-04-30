@@ -1,4 +1,4 @@
-from motion_vision_net import VisionNetNoField, VisionNet
+from motion_vision_net import VisionNetNoField, VisionNet_1F
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -111,7 +111,7 @@ individual = pop_history[best_index]
 
 # net = VisionNetNoField(params['dt'], [24, 64], device=params['device'])
 net_params = condition_inputs(individual)
-net = VisionNet(params['dt'], [24,64], 5, device=params['device'], params=net_params)
+net = VisionNet_1F(params['dt'], [24, 64], 5, device=params['device'], params=net_params)
 
 data_cw = torch.zeros([len(loader_testing)], device=params['device'])
 data_ccw = torch.zeros([len(loader_testing)], device=params['device'])

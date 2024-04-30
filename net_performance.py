@@ -1,4 +1,4 @@
-from motion_vision_net import VisionNet, NetHandler
+from motion_vision_net import VisionNet_1F, NetHandler
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -20,7 +20,7 @@ data_test = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTest3s')
 loader_testing = DataLoader(data_test, shuffle=False)
 
 
-net = NetHandler(VisionNet, params['dt'], [24,64], 5, device=params['device'])
+net = NetHandler(VisionNet_1F, params['dt'], [24, 64], 5, device=params['device'])
 net.load_state_dict(torch.load('Runs/20240419/CHECKPT-19-04-2024-16-03-18.pt'))
 net.setup()
 criterion = nn.MSELoss()

@@ -1,4 +1,4 @@
-from motion_vision_net import VisionNetNoField, VisionNet
+from motion_vision_net import VisionNetNoField, VisionNet_1F
 import matplotlib.pyplot as plt
 import time
 import torch
@@ -114,7 +114,7 @@ loader_testing = DataLoader(data_test, shuffle=True)
 loss_fn = nn.MSELoss()
 
 net = VisionNetNoField(params['dt'], [24, 64], device=params['device'])
-net = VisionNet(params['dt'], [24,64], 5, device=params['device'])
+net = VisionNet_1F(params['dt'], [24, 64], 5, device=params['device'])
 if plot:
     # plt.figure(1)
     # plt.suptitle('Input')

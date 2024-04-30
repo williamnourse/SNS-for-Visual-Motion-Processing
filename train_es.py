@@ -7,7 +7,7 @@ import torch.multiprocessing as mp
 import os
 import numpy as np
 import pandas as pd
-from motion_vision_net import VisionNet
+from motion_vision_net import VisionNet_1F
 from motion_data import ClipDataset
 import time
 import cma
@@ -163,7 +163,7 @@ def individual(x, batch, targets):#, pop_history=None):
     dt = 1 / (30 * 13) * 1000
     shape_input = [24, 64]
     shape_field = 5
-    net = VisionNet(dt, shape_input, shape_field)
+    net = VisionNet_1F(dt, shape_input, shape_field)
     # torch._dynamo.reset()
     with torch.no_grad():
         net.params.update(params)

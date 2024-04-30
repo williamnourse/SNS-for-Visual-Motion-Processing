@@ -7,7 +7,7 @@ from torch.nn.functional import mse_loss
 from torch.utils.data import DataLoader
 # import pandas as pd
 import argparse
-from motion_vision_net import VisionNet, NetHandler
+from motion_vision_net import VisionNet_1F, NetHandler, VisionNet_1F_FB
 from motion_data import ClipDataset
 from datetime import datetime
 import time
@@ -58,7 +58,7 @@ train_dataloader = DataLoader(train, batch_size=BATCH_SIZE, shuffle=True)
 test_dataloader = DataLoader(test, batch_size=BATCH_SIZE, shuffle=False)
 
 for r in range(N_SEEDS):
-    model = NetHandler(VisionNet, DT, IMG_SIZE, FIELD_SIZE, device=device).to(device)
+    model = NetHandler(VisionNet_1F_FB, DT, IMG_SIZE, FIELD_SIZE, device=device).to(device)
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
@@ -133,10 +133,10 @@ for r in range(N_SEEDS):
         epoch += 1
 
         print('Test Loss: %.4f | Test Accuracy: %.2f%% | Time: %i secs' % (test_loss / (i+1), 100*num_correct/total, time.time()-start))
-        torch.save(model.state_dict(),'1-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
+        torch.save(model.state_dict(),'1-FB-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
 
         save_data = {'loss': loss_history, 'lossTest': loss_test_history, 'accuracy': accuracy_history}
-        pickle.dump(save_data, open('1-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
+        pickle.dump(save_data, open('1-FB-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
 
     plt.figure()
     plt.subplot(2,1,1)
