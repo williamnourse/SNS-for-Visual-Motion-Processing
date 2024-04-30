@@ -35,6 +35,8 @@ class ClipDataset(Dataset):
         frames = frames/255
 
         label = float(class_name)
+        if label < 0:
+            frames = torch.flip(frames, dims=(0,))
         return frames, label
 
 def grating(interval):
@@ -83,13 +85,13 @@ if __name__ == '__main__':
     img = imgs[0,0,:,:]
     print(img.shape)
 
-    interval = 9
-    frames = grating(interval)
-    print(frames.shape)
-    plt.figure()
-    for i in range(14):
-        plt.subplot(2,7,i+1)
-        plt.imshow(frames[i,:,:])
-        plt.clim(0,1)
+    # interval = 9
+    # frames = grating(interval)
+    # print(frames.shape)
+    # plt.figure()
+    # for i in range(14):
+    #     plt.subplot(2,7,i+1)
+    #     plt.imshow(frames[i,:,:])
+    #     plt.clim(0,1)
 
     plt.show()

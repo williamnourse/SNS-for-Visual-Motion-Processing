@@ -24,13 +24,19 @@ FIELD_SIZE = 5
 N_SEEDS = 1
 LOG_INTERVAL = 1
 
-def vel_to_state(vel):
+def vel_to_state(vel, device):
     """
     Convert velocity labels in the dataset to their corresponding neural voltage
     :param vel: Velocity label
     :return: State
     """
-    return 1 - ((vel-.1)/0.4) * (1-0.1)
+    state = torch.zeros([len(vel), 2], device=device)
+    state[:,0] = -2*vel
+    state[:,1] = 2*vel
+    return torch.clamp(state, min=0)
+
+# vel = torch.tensor([-0.5, -0.45, -0.4, -0.35, -0.3, -0.25, -0.2, -0.15, -0.1, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5])
+# out = vel_to_state(vel)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 train = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTrain')
@@ -63,8 +69,8 @@ for r in range(N_SEEDS):
                 # get the inputs
                 inputs, labels = data
                 inputs, labels = inputs.to(device), labels.to(device)
-                targets = vel_to_state(labels).type(model.net.dtype)
-                outputs = torch.zeros_like(targets)
+                targets = vel_to_state(labels, device).type(model.net.dtype)
+                # outputs = torch.zeros_like(targets)
                 # inputs = inputs.view(-1, 28, 28)
 
                 model.setup()
@@ -95,7 +101,7 @@ for r in range(N_SEEDS):
             for i, data in enumerate(tqdm(test_dataloader)):
                 inputs, labels = data
                 inputs, labels = inputs.to(device), labels.to(device)
-                targets = vel_to_state(labels).type(model.net.dtype)
+                targets = vel_to_state(labels, device).type(model.net.dtype)
                 # outputs = torch.zeros_like(targets)
                 # inputs = inputs.view(-1, 28, 28)
                 states = model.init(inputs.shape[0])
@@ -107,10 +113,10 @@ for r in range(N_SEEDS):
         epoch += 1
 
         print('Test Loss: %.4f | Time: %i secs' % (test_loss / (i+1), time.time()-start))
-        torch.save(model.state_dict(),'CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
+        torch.save(model.state_dict(),'1-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
 
         save_data = {'loss': loss_history, 'lossTest': loss_test_history}
-        pickle.dump(save_data, open('LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
+        pickle.dump(save_data, open('1-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
 
     plt.figure()
     plt.subplot(2,1,1)
