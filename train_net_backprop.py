@@ -30,14 +30,16 @@ def vel_to_state(vel, device):
     :param vel: Velocity label
     :return: State
     """
-    state = torch.zeros([len(vel), 2], device=device)
-    state[:,0] = -2*vel
-    state[:,1] = 2*vel
-    return torch.clamp(state, min=0)
+    # state = torch.zeros([len(vel), 2], device=device)
+    # state[:,0] = 2*vel
+    # state[:,1] = -2*vel
+    # return torch.clamp(state, min=0)
+    return 2*vel
 
 def accuracy(states, labels, device):
-    states = torch.diff(states, dim=1).flatten()
-    labels = torch.diff(labels, dim=1).flatten()
+    # states = torch.diff(states, dim=1).flatten()
+    # state_diff = states[:,0] - states[:,1]
+    # labels = torch.diff(labels, dim=1).flatten()
     targets = torch.tensor(2*[-0.5, -0.45, -0.4, -0.35, -0.3, -0.25, -0.2, -0.15, -0.1, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5], device=device)
     diff = targets.unsqueeze(0) - states.unsqueeze(1)
     abs_diff = torch.abs(diff)
@@ -60,7 +62,7 @@ test_dataloader = DataLoader(test, batch_size=BATCH_SIZE, shuffle=False)
 for r in range(N_SEEDS):
     model = NetHandler(VisionNet_1F_FB, DT, IMG_SIZE, FIELD_SIZE, device=device).to(device)
     criterion = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
     test_loss = 0.0
     test_loss_last = 0.0
@@ -92,6 +94,7 @@ for r in range(N_SEEDS):
                 states = model.init(inputs.shape[0])
                 outputs = model(inputs, states)
                 # reset hidden states
+                outputs = outputs[:,0]-outputs[:,1]
                 # states = model.init(BATCH_SIZE)
 
                 loss = criterion(outputs, targets)
@@ -123,6 +126,7 @@ for r in range(N_SEEDS):
                 states = model.init(inputs.shape[0])
 
                 outputs = model(inputs, states)
+                outputs = outputs[:, 0] - outputs[:, 1]
                 placeholder = criterion(outputs, targets)
                 test_loss += placeholder.detach().item()
                 a, b = accuracy(outputs, targets, device)
