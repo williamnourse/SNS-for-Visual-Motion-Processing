@@ -2,16 +2,24 @@ import pickle
 import matplotlib.pyplot as plt
 import torch
 
-data_test = pickle.load(open('20240419-Results.p', 'rb'))
+# data_test = pickle.load(open('test_no_train_mean.p', 'rb'))
+# data_train = pickle.load(open('train_no_train_mean.p', 'rb'))
+# field_test = pickle.load(open('field_test_no_train_mean.p', 'rb'))
+field_train = pickle.load(open('field_no_train_mean.p', 'rb'))
 
 def accuracy(data):
     ccw = data['ccw']
     cw = data['cw']
+    targets = data['targets']
     num_trials = len(cw)
     num_correct = 0
     for i in range(num_trials):
-        if ccw[i] > cw[i]:
-            num_correct += 1
+        if targets[i] > 0:
+            if cw[i] > ccw[i]:
+                num_correct += 1
+        else:
+            if ccw[i] > cw[i]:
+                num_correct += 1
     print('%i Trials, %i Correct, %.4f Accuracy Ratio'%(num_trials, num_correct, num_correct/num_trials))
 
 def plot_data(data, title):
@@ -21,7 +29,7 @@ def plot_data(data, title):
     cw_sorted = data['cw'][indices]
     start = 0
     i = 0
-    current = 0.1
+    current = -0.5
     targets = []
     ccw_means = []
     ccw_lows = []
@@ -90,7 +98,13 @@ def plot_data(data, title):
     plt.ylabel('Mean Normalized Response')
     plt.xlabel('Velocity (rad/s')
 
-plot_data(data_test, 'Basic Training')
-accuracy(data_test)
+# plot_data(data_test, 'No Field')
+# plot_data(data_train, 'Training Set')
+# plot_data(field_test, 'Field')
+plot_data(field_train, 'Training Set')
+# accuracy(data_test)
+# accuracy(data_train)
+# accuracy(field_test)
+accuracy(field_train)
 
 plt.show()

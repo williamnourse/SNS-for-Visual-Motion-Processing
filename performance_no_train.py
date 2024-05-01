@@ -1,49 +1,9 @@
-from motion_vision_net import VisionNetNoField, VisionNet_1F
+from motion_vision_net import VisionNetNoField, VisionNetNoTrain
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from motion_data import ClipDataset
 import pickle
-import numpy as np
-
-def condition_inputs(x):
-    params = nn.ParameterDict({
-        'stdCenBO': nn.Parameter(torch.tensor(10**x[0]), requires_grad=False),
-        'ampRelBO': nn.Parameter(torch.tensor(x[1]), requires_grad=False),
-        'stdSurBO': nn.Parameter(torch.tensor(10**x[2]), requires_grad=False),
-        'ratioTauBO': nn.Parameter(torch.tensor(x[3]), requires_grad=False),
-        'stdCenL': nn.Parameter(torch.tensor(10**x[4]), requires_grad=False),
-        'ampRelL': nn.Parameter(torch.tensor(x[5]), requires_grad=False),
-        'stdSurL': nn.Parameter(torch.tensor(10**x[6]), requires_grad=False),
-        'stdCenBF': nn.Parameter(torch.tensor(10**x[7]), requires_grad=False),
-        'ampRelBF': nn.Parameter(torch.tensor(x[8]), requires_grad=False),
-        'stdSurBF': nn.Parameter(torch.tensor(10**x[9]), requires_grad=False),
-        'ratioTauBF': nn.Parameter(torch.tensor(x[10]), requires_grad=False),
-        'conductanceLEO': nn.Parameter(torch.tensor(x[11]), requires_grad=False),
-        'ratioTauEO': nn.Parameter(torch.tensor(x[12]), requires_grad=False),
-        'conductanceBODO': nn.Parameter(torch.tensor(x[13]), requires_grad=False),
-        'ratioTauDO': nn.Parameter(torch.tensor(x[14]), requires_grad=False),
-        'conductanceDOSO': nn.Parameter(torch.tensor(x[15]), requires_grad=False),
-        'ratioTauSO': nn.Parameter(torch.tensor(x[16]), requires_grad=False),
-        'conductanceLEF': nn.Parameter(torch.tensor(x[17]), requires_grad=False),
-        'ratioTauEF': nn.Parameter(torch.tensor(x[18]), requires_grad=False),
-        'conductanceBFDF': nn.Parameter(torch.tensor(x[19]), requires_grad=False),
-        'ratioTauDF': nn.Parameter(torch.tensor(x[20]), requires_grad=False),
-        'conductanceDFSF': nn.Parameter(torch.tensor(x[21]), requires_grad=False),
-        'ratioTauSF': nn.Parameter(torch.tensor(x[22]), requires_grad=False),
-        'conductanceEOOn': nn.Parameter(torch.tensor(10*x[23]), requires_grad=False),
-        'conductanceDOOn': nn.Parameter(torch.tensor(x[24]), requires_grad=False),
-        'conductanceEFOff': nn.Parameter(torch.tensor(x[25]), requires_grad=False),
-        'conductanceDFOff': nn.Parameter(torch.tensor(x[26]), requires_grad=False),
-        'biasEO': nn.Parameter(torch.tensor(x[27]), requires_grad=False),
-        'biasDO': nn.Parameter(torch.tensor(x[28]), requires_grad=False),
-        'biasSO': nn.Parameter(torch.tensor(x[29]), requires_grad=False),
-        'biasEF': nn.Parameter(torch.tensor(x[30]), requires_grad=False),
-        'biasDF': nn.Parameter(torch.tensor(x[31]), requires_grad=False),
-        'biasSF': nn.Parameter(torch.tensor(x[32]), requires_grad=False),
-        'gainHorizontal': nn.Parameter(torch.tensor(x[33]), requires_grad=False)
-    })
-    return params
 
 def run_sample(sample, net: nn.Module):
     """
@@ -98,20 +58,12 @@ def run_sample(sample, net: nn.Module):
     return cw_mean, ccw_mean
 
 params = {'dt': 1/(30*13)*1000, 'device': 'cuda'}
-data_test = ClipDataset('FlyWheelTest3s')
+data_test = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTest3s')
 loader_testing = DataLoader(data_test, shuffle=False)
-trial = '2024-04-05-1712341062.2805214'
-best_history = pickle.load(open('Runs/'+trial+'-Best-History.p', 'rb'))
-fit_history = pickle.load(open('Runs/'+trial+'-Fit-History.p', 'rb'))
-pop_history = pickle.load(open('Runs/'+trial+'-Pop-History.p','rb'))
-num_gen = len(best_history)
-pop_size = len(fit_history)/num_gen
-best_index = np.where(np.array(fit_history) <= 0.0001)[0][0]
-individual = pop_history[best_index]
 
-# net = VisionNetNoField(params['dt'], [24, 64], device=params['device'])
-net_params = condition_inputs(individual)
-net = VisionNet_1F(params['dt'], [24, 64], 5, device=params['device'], params=net_params)
+
+net = VisionNetNoField(params['dt'], [24, 64], device=params['device'])
+net = VisionNetNoTrain(params['dt'], [24,64], 5, device=params['device'])
 
 data_cw = torch.zeros([len(loader_testing)], device=params['device'])
 data_ccw = torch.zeros([len(loader_testing)], device=params['device'])
@@ -133,4 +85,4 @@ with torch.no_grad():
         targets[i] = target
 
 data = {'cw': data_cw.to('cpu'), 'ccw': data_ccw.to('cpu'), 'targets': targets}
-pickle.dump(data, open(trial+'_best.p', 'wb'))
+pickle.dump(data, open('field_no_train_mean.p', 'wb'))

@@ -3,6 +3,16 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import pickle
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import matplotlib.cm as cm
+
+def plot_clip(frames):
+    frame_list = []
+    fig = plt.figure()
+    for i in range(30):
+        frame_list.append([plt.imshow(frames[i,:,:], cmap=cm.Greys_r, animated=True)])
+    ani = animation.ArtistAnimation(fig, frame_list, interval=50, blit=True, repeat_delay=5)
+    plt.show()
 
 class ClipDataset(Dataset):
     def __init__(self, root_dir, dtype=torch.float32, device='cpu'):
@@ -71,7 +81,7 @@ def grating(interval):
 
 if __name__ == '__main__':
     train = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTrain')
-    test = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTest')
+    test = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTest3s')
     sample_img, sample_label = train[0]
     print(train.__len__())
     print(test.__len__())
