@@ -4906,6 +4906,7 @@ class NetHandlerWt(nn.Module):
 
         self.batch_size = X.size(1)
         self.n_steps = X.size(0)
+        self.n_substeps = 13
 
         # rnn_out => n_steps, batch_size, n_neurons (hidden states for each time step)
         # self.hidden => 1, batch_size, n_neurons (final state from each rnn_out)
@@ -4915,14 +4916,21 @@ class NetHandlerWt(nn.Module):
         # while step < 400:
         #     states = self.net(X[0, :, :, :], states)
         #     step += 1
+        step = 0
         for i in range(self.n_steps):
-            states = self.net(X[i,:,:, :], states)
+            for j in range(self.n_substeps):
+                states = self.net(X[i,:,:, :], states)
+                if step == 0:
+                    mean = torch.cat((states[-4].flatten(start_dim=1), states[-3].flatten(start_dim=1), states[-2].flatten(start_dim=1), states[-1].flatten(start_dim=1)), 1)
+                else:
+                    mean += torch.cat((states[-4].flatten(start_dim=1), states[-3].flatten(start_dim=1), states[-2].flatten(start_dim=1), states[-1].flatten(start_dim=1)), 1)
+                step += 1
             # running_ccw += states[-1][:,1]
             # running_cw += states[-1][:, 0]
             # print(ext+prev)
 
         # print(out)
-        return self.net.hc(torch.cat((states[-4].flatten(start_dim=1), states[-3].flatten(start_dim=1), states[-2].flatten(start_dim=1), states[-1].flatten(start_dim=1)), 1))
+        return self.net.hc(mean/(i+1))
         # return running_ccw/i, running_cw/i  # batch_size X n_output
 
 if __name__ == "__main__":

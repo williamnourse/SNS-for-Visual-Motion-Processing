@@ -16,8 +16,8 @@ from tqdm import tqdm
 
 start = time.time()
 N_STEPS = 90
-BATCH_SIZE = 32
-N_EPOCHS = 100
+BATCH_SIZE = 18
+N_EPOCHS = 20
 DT = ((1/30)/13)*1000
 IMG_SIZE = [24,64]
 FIELD_SIZE = 5
