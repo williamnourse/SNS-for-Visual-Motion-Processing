@@ -7,7 +7,8 @@ from torch.nn.functional import mse_loss
 from torch.utils.data import DataLoader
 # import pandas as pd
 import argparse
-from motion_vision_net import VisionNet_1F, NetHandler, VisionNet_1F_FB, VisionNet_3F, NetHandlerWt
+# from motion_vision_net import VisionNet_1F, NetHandler, VisionNet_1F_FB, VisionNet_3F, NetHandlerWt
+from motion_vision_net_v2 import NetHandler, VisionNetv2
 from motion_data import ClipDataset
 from datetime import datetime
 import time
@@ -15,11 +16,15 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 start = time.time()
-N_STEPS = 90
-BATCH_SIZE = 18
+N_STEPS = 30
+BATCH_SIZE = 12
 N_EPOCHS = 20
+N_WARMUP = 15 #*13
 DT = ((1/30)/13)*1000
 IMG_SIZE = [24,64]
+N_LAMINA = 5
+N_MEDULLA = 10
+N_LOBULA = 4
 FIELD_SIZE = 5
 N_SEEDS = 1
 LOG_INTERVAL = 1
@@ -53,9 +58,9 @@ train_dataloader = DataLoader(train, batch_size=BATCH_SIZE, shuffle=True)
 test_dataloader = DataLoader(test, batch_size=BATCH_SIZE, shuffle=False)
 
 for r in range(N_SEEDS):
-    model = NetHandlerWt(VisionNet_3F, DT, IMG_SIZE, FIELD_SIZE, device=device).to(device)
+    model = NetHandler(VisionNetv2, IMG_SIZE, N_LAMINA, N_MEDULLA, N_LOBULA, FIELD_SIZE, device=device).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     test_loss = 0.0
     test_loss_last = 0.0
@@ -69,11 +74,10 @@ for r in range(N_SEEDS):
         train_acc = 0.0
         with torch.enable_grad():
             model.train()
-            # zero the parameter gradients
-            optimizer.zero_grad()
 
             # TRAINING ROUND
             for i, data in enumerate(tqdm(train_dataloader)):
+
                 # print(i)
                 # get the inputs
                 inputs, labels = data
@@ -83,9 +87,15 @@ for r in range(N_SEEDS):
                 # inputs = inputs.view(-1, 28, 28)
 
                 model.setup()
-                # for j in range(BATCH_SIZE):
+
+                # Warmup
+                warmup = torch.zeros([inputs.shape[0], 15, 24, 64], device=device) + 0.5
                 states = model.init(inputs.shape[0])
-                outputs = model(inputs, states)
+                _, states = model(warmup, states)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+                outputs, states = model(inputs, states)
                 # reset hidden states
                 # states = model.init(BATCH_SIZE)
 
@@ -128,10 +138,10 @@ for r in range(N_SEEDS):
         epoch += 1
 
         print('Test Loss: %.4f | Test Accuracy: %.2f%% | Time: %i secs' % (test_loss / (i+1), test_acc/(i+1), time.time()-start))
-        torch.save(model.state_dict(),'B-1-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
+        torch.save(model.state_dict(),'B-CONV-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
 
         save_data = {'loss': loss_history, 'lossTest': loss_test_history, 'accuracy': accuracy_history}
-        pickle.dump(save_data, open('B-1-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
+        pickle.dump(save_data, open('B-CONV-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
 
     plt.figure()
     plt.subplot(2,1,1)
