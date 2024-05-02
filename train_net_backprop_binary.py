@@ -17,9 +17,9 @@ from tqdm import tqdm
 
 start = time.time()
 N_STEPS = 30
-BATCH_SIZE = 16
+BATCH_SIZE = 14
 STEP_INTERVAL = 1
-N_EPOCHS = 100
+N_EPOCHS = 500
 N_WARMUP = 15 #*13
 DT = ((1/30)/13)*1000
 IMG_SIZE = [24,64]
@@ -61,7 +61,7 @@ test_dataloader = DataLoader(test, batch_size=BATCH_SIZE, shuffle=False)
 for r in range(N_SEEDS):
     model = NetHandler(VisionNetv2, IMG_SIZE, N_LAMINA, N_MEDULLA, N_LOBULA, FIELD_SIZE, device=device).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     test_loss = 0.0
     test_loss_last = 0.0
@@ -99,7 +99,7 @@ for r in range(N_SEEDS):
                     # zero the parameter gradients
                     optimizer.zero_grad()
                     model.setup()
-                    outputs, states = model(inputs, states)
+                    outputs, _ = model(inputs, states)
                     # reset hidden states
                     # states = model.init(BATCH_SIZE)
 

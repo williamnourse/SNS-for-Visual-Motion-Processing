@@ -35,13 +35,13 @@ class AdaptiveSubnetwork(nn.Module):
 
     def init(self, batch_size=None):
         if batch_size is None:
-            state_fast = torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape)
-            state_slow = torch.zeros(self.shape, dtype=self.dtype, device=self.device) + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape)
+            state_fast = torch.zeros(self.shape, dtype=self.dtype, device=self.device)# + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape)
+            state_slow = torch.zeros(self.shape, dtype=self.dtype, device=self.device)# + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape)
         else:
             batch_shape = self.shape.copy()
             batch_shape.insert(0,batch_size)
-            state_fast = torch.zeros(batch_shape, dtype=self.dtype, device=self.device) + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(batch_shape)
-            state_slow = torch.zeros(batch_shape, dtype=self.dtype, device=self.device) + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(batch_shape)
+            state_fast = torch.zeros(batch_shape, dtype=self.dtype, device=self.device)# + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(batch_shape)
+            state_slow = torch.zeros(batch_shape, dtype=self.dtype, device=self.device)# + self.params['rest'].unsqueeze(1).unsqueeze(1).expand(batch_shape)
         return state_fast, state_slow
 
     def setup(self):
@@ -207,16 +207,19 @@ class NetHandler(nn.Module):
         #     states = self.net(X[0, :, :, :], states)
         #     step += 1
         step = 0
+        size = self.n_substeps*self.n_steps
+        lobula = torch.zeros_like(states[-1])
         for i in range(self.n_steps):
             for j in range(self.n_substeps):
                 states = self.net(X[i,:,:, :], states)
+                lobula = lobula + states[-1]/size
                 step += 1
             # running_ccw += states[-1][:,1]
             # running_cw += states[-1][:, 0]
             # print(ext+prev)
 
         # print(out)
-        return self.net.decoder(states[-1]), states
+        return self.net.decoder(lobula), states
 
 
 # net = NetHandler(VisionNetv2,[24,64], 5, 10, 4, 5)
