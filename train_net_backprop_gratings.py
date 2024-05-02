@@ -19,7 +19,7 @@ start = time.time()
 N_STEPS = 30
 BATCH_SIZE = 1
 STEP_INTERVAL = 1
-N_EPOCHS = 500
+N_EPOCHS = 2
 N_WARMUP = 15 #*13
 DT = ((1/30)/13)*1000
 IMG_SIZE = [24,64]
@@ -27,7 +27,7 @@ N_LAMINA = 5
 N_MEDULLA = 10
 N_LOBULA = 4
 FIELD_SIZE = 5
-N_SEEDS = 1
+N_SEEDS = 5
 LOG_INTERVAL = 1
 
 def get_accuracy(logit, target, batch_size):
@@ -97,8 +97,11 @@ for r in range(N_SEEDS):
                     optimizer.step()
 
                 train_running_loss += loss.detach().item()
+                loss_history.extend([loss.detach().item()])
                 # print(train_running_loss)
-                train_acc += get_accuracy(outputs, labels, len(labels))
+                acc = get_accuracy(outputs, labels, len(labels))
+                train_acc += acc
+                accuracy_history.extend([acc])
                 eval += 1
             sample += 1
         # if i%LOG_INTERVAL==0:
@@ -106,13 +109,13 @@ for r in range(N_SEEDS):
         #   % (r, epoch, i, train_running_loss / (i+1), time.time()-start))
 
         print('Run: %i | Epoch:  %d | Loss: %.4f | Train Accuracy: %.2f%% Time: %i secs' % (r, epoch, train_running_loss / (eval), train_acc/(eval), time.time()-start))
-        loss_history.extend([train_running_loss/(eval)])
-        accuracy_history.extend([train_acc/eval])
+
+
         epoch += 1
-        torch.save(model.state_dict(),'GRATE-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
+        torch.save(model.state_dict(),str(r)+'GRATE-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
 
         save_data = {'loss': loss_history, 'accuracy': accuracy_history}
-        pickle.dump(save_data, open('GRATE-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
+        pickle.dump(save_data, open(str(r)+'GRATE-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
 
     plt.figure()
     plt.subplot(2,1,1)

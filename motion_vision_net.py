@@ -1710,7 +1710,8 @@ class VisionNet_1F(nn.Module):
         self.dtype = dtype
         self.shape_input = shape_input
         self.shape_field = shape_field
-        self.shape_post_conv = [x - (shape_field-1) for x in self.shape_input]
+        # self.shape_post_conv = [x - (shape_field-1) for x in self.shape_input]
+        self.shape_post_conv = shape_input
         shape_emd = [x - 2 for x in self.shape_post_conv]
         self.shape_emd = shape_emd
         shape_emd_flat = shape_emd[0]*shape_emd[1]
@@ -1722,28 +1723,31 @@ class VisionNet_1F(nn.Module):
             'reversalEx': nn.Parameter(torch.tensor([5.0], dtype=dtype).to(device), requires_grad=False),
             'reversalIn': nn.Parameter(torch.tensor([-2.0], dtype=dtype).to(device), requires_grad=False),
             'reversalMod': nn.Parameter(torch.tensor([0.0], dtype=dtype).to(device), requires_grad=False),
-            'stdCenBO': nn.Parameter(5*torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'ampRelBO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'stdSurBO': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceInBO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'stdCenBO': nn.Parameter(5*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'ampRelBO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'stdSurBO': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauBO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'stdCenL': nn.Parameter(5*torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'ampRelL': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'stdSurL': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'stdCenBF': nn.Parameter(5*torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'ampRelBF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'stdSurBF': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceInL': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'stdCenL': nn.Parameter(5*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'ampRelL': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'stdSurL': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceInBF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'stdCenBF': nn.Parameter(5*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'ampRelBF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            # 'stdSurBF': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauBF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceLEO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceLEO': nn.Parameter(torch.tensor(0.25, dtype=dtype).to(device), requires_grad=False),
             'ratioTauEO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceBODO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceBODO': nn.Parameter(torch.tensor(0.546, dtype=dtype).to(device), requires_grad=False),
             'ratioTauDO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceDOSO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceDOSO': nn.Parameter(torch.tensor(0.262, dtype=dtype).to(device), requires_grad=False),
             'ratioTauSO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceLEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceLEF': nn.Parameter(torch.tensor(0.25, dtype=dtype).to(device), requires_grad=False),
             'ratioTauEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceBFDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceBFDF': nn.Parameter(torch.tensor(1.173, dtype=dtype).to(device), requires_grad=False),
             'ratioTauDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceDFSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceDFSF': nn.Parameter(torch.tensor(0.25, dtype=dtype).to(device), requires_grad=False),
             'ratioTauSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'conductanceEOOn': nn.Parameter(10*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'conductanceDOOn': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
@@ -1753,16 +1757,16 @@ class VisionNet_1F(nn.Module):
             'conductanceSFOff': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauOnCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauOnCCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasEO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasDO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasSO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasOn': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'biasEO': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasDO': nn.Parameter(torch.tensor(1.092, dtype=dtype).to(device), requires_grad=False),
+            'biasSO': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasOn': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
             'ratioTauOffCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauOffCCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasOff': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'biasEF': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasDF': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasSF': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasOff': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
             'conductanceOnEx': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'conductanceOnIn': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'conductanceOffEx': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
@@ -1783,7 +1787,8 @@ class VisionNet_1F(nn.Module):
         self.input = m.NonSpikingLayer(shape_input, params=nrn_input_params, device=device, dtype=dtype)
 
         # L
-        self.syn_input_lowpass = m.NonSpikingChemicalSynapseConv(1, 1, shape_field, device=device, dtype=dtype, generator=generator)
+        # self.syn_input_lowpass = m.NonSpikingChemicalSynapseConv(1, 1, shape_field, device=device, dtype=dtype, generator=generator)
+        self.syn_input_lowpass = m.NonSpikingChemicalSynapseElementwise()
         self.lowpass = m.NonSpikingLayer(self.shape_post_conv, device=device, dtype=dtype)
 
         # HS Cells
@@ -1800,7 +1805,8 @@ class VisionNet_1F(nn.Module):
         """
         """Lamina"""
         # Bo
-        self.syn_input_bandpass_on = m.NonSpikingChemicalSynapseConv(1, 1, shape_field, device=device, dtype=dtype, generator=generator)
+        # self.syn_input_bandpass_on = m.NonSpikingChemicalSynapseConv(1, 1, shape_field, device=device, dtype=dtype, generator=generator)
+        self.syn_input_bandpass_on = m.NonSpikingChemicalSynapseElementwise()
         self.bandpass_on = SNSBandpass(self.shape_post_conv, device=device, dtype=dtype)
 
         """Medulla"""
@@ -1835,7 +1841,8 @@ class VisionNet_1F(nn.Module):
         """
         """Lamina"""
         # Bf
-        self.syn_input_bandpass_off = m.NonSpikingChemicalSynapseConv(1, 1, shape_field, device=device, dtype=dtype, generator=generator)
+        # self.syn_input_bandpass_off = m.NonSpikingChemicalSynapseConv(1, 1, shape_field, device=device, dtype=dtype, generator=generator)
+        self.syn_input_bandpass_off = m.NonSpikingChemicalSynapseElementwise()
         self.bandpass_off = SNSBandpass(self.shape_post_conv, device=device, dtype=dtype)
 
         """Medulla"""
@@ -2198,12 +2205,12 @@ class VisionNet_1F(nn.Module):
     def setup(self):
         """Lamina"""
         # Bandpass On
-        conductance, reversal, _ = __calc_2d_field__(self.params['ampRelBO'], self.params['stdCenBO'],
-                                                     self.params['stdSurBO'], self.shape_field,
-                                                     self.params['reversalEx'], self.params['reversalIn'], self.device)
+        # conductance, reversal, _ = __calc_2d_field__(self.params['ampRelBO'], self.params['stdCenBO'],
+        #                                              self.params['stdSurBO'], self.shape_field,
+        #                                              self.params['reversalEx'], self.params['reversalIn'], self.device)
         syn_in_bo_params = nn.ParameterDict({
-            'conductance': nn.Parameter(conductance.to(self.device), requires_grad=False),
-            'reversal': nn.Parameter(reversal.to(self.device), requires_grad=False)
+            'conductance': self.params['conductanceInBO'],
+            'reversal': self.params['reversalIn']
         })
         self.syn_input_bandpass_on.params.update(syn_in_bo_params)
         self.syn_input_bandpass_on.setup()
@@ -2264,12 +2271,12 @@ class VisionNet_1F(nn.Module):
         self.bandpass_on.setup()
 
         # Lowpass
-        conductance, reversal, _ = __calc_2d_field__(self.params['ampRelL'], self.params['stdCenL'],
-                                                     self.params['stdSurL'], self.shape_field,
-                                                     self.params['reversalEx'], self.params['reversalIn'], self.device)
+        # conductance, reversal, _ = __calc_2d_field__(self.params['ampRelL'], self.params['stdCenL'],
+        #                                              self.params['stdSurL'], self.shape_field,
+        #                                              self.params['reversalEx'], self.params['reversalIn'], self.device)
         syn_in_l_params = nn.ParameterDict({
-            'conductance': nn.Parameter(conductance.to(self.device), requires_grad=False),
-            'reversal': nn.Parameter(reversal.to(self.device), requires_grad=False)
+            'conductance': self.params['conductanceInL'],
+            'reversal': self.params['reversalIn']
         })
         self.syn_input_lowpass.params.update(syn_in_l_params)
         self.syn_input_lowpass.setup()
@@ -2291,12 +2298,12 @@ class VisionNet_1F(nn.Module):
         self.lowpass.params.update(nrn_l_params)
 
         # Bandpass Off
-        conductance, reversal, _ = __calc_2d_field__(self.params['ampRelBF'], self.params['stdCenBF'],
-                                                     self.params['stdSurBF'], self.shape_field,
-                                                     self.params['reversalEx'], self.params['reversalIn'], self.device)
+        # conductance, reversal, _ = __calc_2d_field__(self.params['ampRelBF'], self.params['stdCenBF'],
+        #                                              self.params['stdSurBF'], self.shape_field,
+        #                                              self.params['reversalEx'], self.params['reversalIn'], self.device)
         syn_in_bf_params = nn.ParameterDict({
-            'conductance': nn.Parameter(conductance.to(self.device), requires_grad=False),
-            'reversal': nn.Parameter(reversal.to(self.device), requires_grad=False)
+            'conductance': self.params['conductanceInBF'],
+            'reversal': self.params['reversalIn']
         })
         self.syn_input_bandpass_off.params.update(syn_in_bf_params)
         self.syn_input_bandpass_off.setup()
@@ -2731,17 +2738,17 @@ class VisionNet_1F_FB(nn.Module):
             'ampRelBF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'stdSurBF': nn.Parameter(20*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauBF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceLEO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceLEO': nn.Parameter(torch.tensor(0.25, dtype=dtype).to(device), requires_grad=False),
             'ratioTauEO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceBODO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceBODO': nn.Parameter(torch.tensor(0.546, dtype=dtype).to(device), requires_grad=False),
             'ratioTauDO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceDOSO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceDOSO': nn.Parameter(torch.tensor(0.262, dtype=dtype).to(device), requires_grad=False),
             'ratioTauSO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceLEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceLEF': nn.Parameter(torch.tensor(0.25, dtype=dtype).to(device), requires_grad=False),
             'ratioTauEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceBFDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceBFDF': nn.Parameter(torch.tensor(1.173, dtype=dtype).to(device), requires_grad=False),
             'ratioTauDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceDFSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceDFSF': nn.Parameter(torch.tensor(0.25, dtype=dtype).to(device), requires_grad=False),
             'ratioTauSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'conductanceEOOn': nn.Parameter(10*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'conductanceDOOn': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
@@ -2752,16 +2759,16 @@ class VisionNet_1F_FB(nn.Module):
             'conductanceSFEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauOnCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauOnCCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasEO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasDO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasSO': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasOn': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'biasEO': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasDO': nn.Parameter(torch.tensor(1.0, dtype=dtype).to(device), requires_grad=False),
+            'biasSO': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasOn': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
             'ratioTauOffCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauOffCCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasEF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'biasOff': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'biasEF': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasDF': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasSF': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
+            'biasOff': nn.Parameter(torch.tensor(0.0, dtype=dtype).to(device), requires_grad=False),
             'conductanceOnCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
             'conductanceOnCCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
             'conductanceOffCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
@@ -4867,10 +4874,36 @@ class NetHandler(nn.Module):
         # while step < 400:
         #     states = self.net(X[0, :, :, :], states)
         #     step += 1
+        data = torch.zeros([22, total_steps], device=self.net.device)
+        step = 0
         for i in range(self.n_steps):
             for j in range(self.n_substeps):
                 states = self.net(X[i,:,:, :], states)
                 output = output + states[-1]/total_steps
+                data[0 ,step] = states[0 ][0,10,10]
+                data[1 ,step] = states[1 ][0,10,10]
+                data[2 ,step] = states[2 ][0,10,10]
+                data[3 ,step] = states[3 ][0,10,10]
+                data[4 ,step] = states[4 ][0,10,10]
+                data[5 ,step] = states[5 ][0,10,10]
+                data[6 ,step] = states[6 ][0,10,10]
+                data[7 ,step] = states[7 ][0,10,10]
+                data[8 ,step] = states[8 ][0,10,10]
+                data[9 ,step] = states[9 ][0,10,10]
+                data[10,step] = states[10][0,10,10]
+                data[11,step] = states[11][0,10,10]
+                data[12,step] = states[12][0,10,10]
+                data[13,step] = states[13][0,10,10]
+                data[14,step] = states[14][0,10,10]
+                data[15,step] = states[15][0,10,10]
+                data[16,step] = states[16][0,10,10]
+                data[17,step] = states[17][0,10,10]
+                data[18,step] = states[18][0,10,10]
+                data[19,step] = states[19][0,10,10]
+                data[20,step] = states[20][0,0]
+                data[21,step] = states[20][0,1]
+
+                step += 1
                 # running_ccw += states[-1][:,1]
                 # running_cw += states[-1][:, 0]
                 # print(ext+prev)
