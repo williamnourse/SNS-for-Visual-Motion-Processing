@@ -36,15 +36,17 @@ def vel_to_state(vel, device):
     :param vel: Velocity label
     :return: State
     """
-    state = torch.zeros(len(vel), device=device, dtype=torch.int64)
+    state = torch.zeros([len(vel),2], device=device, dtype=torch.float32)
     for i in range(len(vel)):
         if vel[i] < 0:
-            state[i] = 1
+            state[i,0] = 1
+        else:
+            state[i,1] = 1
     return state
 
 def get_accuracy(logit, target, batch_size):
     ''' Obtain accuracy for training round '''
-    corrects = (torch.max(logit, 1)[1].view(target.size()).data == target.data).sum()
+    corrects = (torch.max(logit, 1)[1] == torch.max(target, 1)[1]).sum()
     accuracy = 100.0 * corrects/batch_size
     return accuracy.item()
 
@@ -60,7 +62,7 @@ test_dataloader = DataLoader(test, batch_size=BATCH_SIZE, shuffle=False)
 
 for r in range(N_SEEDS):
     model = NetHandler(VisionNetv2, IMG_SIZE, N_LAMINA, N_MEDULLA, N_LOBULA, FIELD_SIZE, device=device).to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     test_loss = 0.0
