@@ -18,7 +18,7 @@ class AdaptiveSubnetwork(nn.Module):
             'ratioTauF': nn.Parameter(torch.rand(num, dtype=dtype, generator=generator).to(device)),
             'ratioTauS': nn.Parameter(torch.rand(num, dtype=dtype, generator=generator).to(device)),
             'bias': nn.Parameter(torch.zeros(self.shape, dtype=dtype).to(device), requires_grad=False),
-            'rest': nn.Parameter(torch.rand(num, dtype=dtype, generator=generator).to(device)),
+            'rest': nn.Parameter(torch.zeros(self.shape, dtype=dtype).to(device), requires_grad=False),
             'leak': nn.Parameter(torch.ones(self.shape, dtype=dtype).to(device), requires_grad=False),
             'alpha': nn.Parameter(torch.rand(num, dtype=dtype, generator=generator).to(device)),
             'reversal': nn.Parameter((torch.tensor([5.0], dtype=dtype)).to(device), requires_grad=False),
@@ -46,20 +46,20 @@ class AdaptiveSubnetwork(nn.Module):
 
     def setup(self):
         params_nrn_fast = nn.ParameterDict({
-            'tau': nn.Parameter(self.tau_fastest*self.params['ratioTauF'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'tau': nn.Parameter(self.tau_fastest*self.params['ratioTauF'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device)),
             'leak': self.params['leak'],
-            'rest': nn.Parameter(self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'rest': self.params['rest'],
             'bias': self.params['bias'],
-            'init': nn.Parameter(self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'init': nn.Parameter(torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
         })
         self.fast.params.update(params_nrn_fast)
 
         params_nrn_slow = nn.ParameterDict({
-            'tau': nn.Parameter(self.tau_fastest*self.params['ratioTauS'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'tau': nn.Parameter(self.tau_fastest*self.params['ratioTauS'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device)),
             'leak': self.params['leak'],
-            'rest': nn.Parameter(self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'rest': self.params['rest'],
             'bias': self.params['bias'],
-            'init': nn.Parameter(self.params['rest'].unsqueeze(1).unsqueeze(1).expand(self.shape) + torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'init': nn.Parameter(torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
         })
         self.slow.params.update(params_nrn_slow)
 
@@ -136,12 +136,27 @@ class VisionNetv2(nn.Module):
 
     def setup(self):
         self.syn_retina_lamina.setup()
-        self.nrn_retina.params['tau'] = self.params['tauRatioRetina']*self.tau_fastest
+        params_retina = nn.ParameterDict({
+            'tau': nn.Parameter(self.params['tauRatioRetina']*self.tau_fastest + torch.zeros(self.shape, dtype=self.dtype).to(self.device)),
+            'leak': nn.Parameter(torch.ones(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'rest': nn.Parameter(torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'bias': nn.Parameter(torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+            'init': nn.Parameter(torch.zeros(self.shape, dtype=self.dtype).to(self.device), requires_grad=False),
+        })
+        self.nrn_retina.params.update(params_retina)
         self.nrn_lamina.setup()
         self.syn_lamina_medulla.setup()
         self.nrn_medulla.setup()
         self.syn_medulla_lobula.setup()
-        self.nrn_lobula.params['tau'] = self.params['tauRatioLobula'].unsqueeze(1).unsqueeze(1).expand(self.shape_lobula)*self.tau_fastest
+        params_lobula = nn.ParameterDict({
+            'tau': nn.Parameter(
+                self.params['tauRatioLobula'].unsqueeze(1).unsqueeze(1).expand(self.shape_lobula)*self.tau_fastest),
+            'leak': nn.Parameter(torch.ones(self.shape_lobula, dtype=self.dtype).to(self.device), requires_grad=False),
+            'rest': nn.Parameter(torch.zeros(self.shape_lobula, dtype=self.dtype).to(self.device), requires_grad=False),
+            'bias': nn.Parameter(torch.zeros(self.shape_lobula, dtype=self.dtype).to(self.device), requires_grad=False),
+            'init': nn.Parameter(torch.zeros(self.shape_lobula, dtype=self.dtype).to(self.device), requires_grad=False),
+        })
+        self.nrn_lobula.params.update(params_lobula)
 
     def forward(self, x, states):
         state_retina, state_lamina_fast, state_lamina_slow, state_medulla_fast, state_medulla_slow, state_lobula = states
@@ -156,7 +171,9 @@ class VisionNetv2(nn.Module):
         state_medulla_fast, state_medulla_slow = self.nrn_medulla(syn_lamina_medulla, state_medulla_fast, state_medulla_slow)
         state_lobula = self.nrn_lobula(syn_medulla_lobula, state_lobula)
 
-        decoded = self.decoder(state_lobula)
+        if (torch.isnan(state_retina).any() or torch.isnan(state_lamina_fast).any() or torch.isnan(state_lamina_slow).any()
+                or torch.isnan(state_medulla_fast).any() or torch.isnan(state_medulla_slow).any() or torch.isnan(state_lobula).any()):
+            print('Uh oh')
 
         return [state_retina, state_lamina_fast, state_lamina_slow, state_medulla_fast, state_medulla_slow, state_lobula]
 

@@ -17,8 +17,9 @@ from tqdm import tqdm
 
 start = time.time()
 N_STEPS = 30
-BATCH_SIZE = 12
-N_EPOCHS = 20
+BATCH_SIZE = 16
+STEP_INTERVAL = 1
+N_EPOCHS = 100
 N_WARMUP = 15 #*13
 DT = ((1/30)/13)*1000
 IMG_SIZE = [24,64]
@@ -52,15 +53,15 @@ def get_accuracy(logit, target, batch_size):
 # out = vel_to_state(vel)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-train = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTrain')
-test = ClipDataset('/home/will/flywheel-rotation-dataset/FlyWheelTest')
+train = ClipDataset('/home/will/flywheel-rotation-dataset/ToyTrain')
+test = ClipDataset('/home/will/flywheel-rotation-dataset/ToyTest')
 train_dataloader = DataLoader(train, batch_size=BATCH_SIZE, shuffle=True)
 test_dataloader = DataLoader(test, batch_size=BATCH_SIZE, shuffle=False)
 
 for r in range(N_SEEDS):
     model = NetHandler(VisionNetv2, IMG_SIZE, N_LAMINA, N_MEDULLA, N_LOBULA, FIELD_SIZE, device=device).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
     test_loss = 0.0
     test_loss_last = 0.0
@@ -69,15 +70,17 @@ for r in range(N_SEEDS):
     accuracy_history = []
     # for epoch in range(N_EPOCHS):  # loop over the dataset multiple times
     epoch = 0
-    while test_loss < test_loss_last or epoch <= N_EPOCHS:
+    # while test_loss < test_loss_last or epoch <= N_EPOCHS:
+    while epoch <= N_EPOCHS:
         train_running_loss = 0.0
         train_acc = 0.0
-        with torch.enable_grad():
-            model.train()
-
-            # TRAINING ROUND
-            for i, data in enumerate(tqdm(train_dataloader)):
-
+        # with torch.enable_grad():
+        model.train()
+        sample = 0
+        eval = 0
+        # TRAINING ROUND
+        for i, data in enumerate(tqdm(train_dataloader)):
+            if sample%STEP_INTERVAL == 0:
                 # print(i)
                 # get the inputs
                 inputs, labels = data
@@ -85,34 +88,39 @@ for r in range(N_SEEDS):
                 targets = vel_to_state(labels, device)
                 # outputs = torch.zeros_like(targets)
                 # inputs = inputs.view(-1, 28, 28)
+                with torch.no_grad():
+                    model.setup()
 
-                model.setup()
+                    # Warmup
+                    warmup = torch.zeros([inputs.shape[0], 15, 24, 64], device=device) + 0.5
+                    states = model.init(inputs.shape[0])
+                    _, states = model(warmup, states)
+                with torch.enable_grad():
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+                    model.setup()
+                    outputs, states = model(inputs, states)
+                    # reset hidden states
+                    # states = model.init(BATCH_SIZE)
 
-                # Warmup
-                warmup = torch.zeros([inputs.shape[0], 15, 24, 64], device=device) + 0.5
-                states = model.init(inputs.shape[0])
-                _, states = model(warmup, states)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-                outputs, states = model(inputs, states)
-                # reset hidden states
-                # states = model.init(BATCH_SIZE)
-
-                loss = criterion(outputs, targets)
-                loss.backward()
-                optimizer.step()
+                    loss = criterion(outputs, targets)
+                    # if torch.isnan(loss):
+                        # print(loss)
+                    loss.backward()
+                    optimizer.step()
 
                 train_running_loss += loss.detach().item()
+                # print(train_running_loss)
                 train_acc += get_accuracy(outputs, targets, len(labels))
-
-            # if i%LOG_INTERVAL==0:
-            #     print('Run: %i | Epoch:  %d | Batch: %i | Loss: %.4f | Time: %i secs'
-            #   % (r, epoch, i, train_running_loss / (i+1), time.time()-start))
+                eval += 1
+            sample += 1
+        # if i%LOG_INTERVAL==0:
+        #     print('Run: %i | Epoch:  %d | Batch: %i | Loss: %.4f | Time: %i secs'
+        #   % (r, epoch, i, train_running_loss / (i+1), time.time()-start))
 
         model.eval()
-        print('Run: %i | Epoch:  %d | Loss: %.4f | Train Accuracy: %.2f%% Time: %i secs' % (r, epoch, train_running_loss / (i+1), train_acc/(i+1), time.time()-start))
-        loss_history.extend([train_running_loss/(i+1)])
+        print('Run: %i | Epoch:  %d | Loss: %.4f | Train Accuracy: %.2f%% Time: %i secs' % (r, epoch, train_running_loss / (eval), train_acc/(eval), time.time()-start))
+        loss_history.extend([train_running_loss/(eval)])
         test_loss_last = test_loss
         test_loss = 0.0
         num_correct = 0
@@ -121,35 +129,52 @@ for r in range(N_SEEDS):
         with torch.no_grad():
             model.setup()
             # optimizer.zero_grad()
+            sample = 0
+            eval = 0
             for i, data in enumerate(tqdm(test_dataloader)):
-                inputs, labels = data
-                inputs, labels = inputs.to(device), labels.to(device)
-                targets = vel_to_state(labels, device)
-                # outputs = torch.zeros_like(targets)
-                # inputs = inputs.view(-1, 28, 28)
-                states = model.init(inputs.shape[0])
+                if sample%STEP_INTERVAL == 0:
+                    inputs, labels = data
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    targets = vel_to_state(labels, device)
+                    # outputs = torch.zeros_like(targets)
+                    # inputs = inputs.view(-1, 28, 28)
 
-                outputs = model(inputs, states)
-                placeholder = criterion(outputs, targets)
-                test_loss += placeholder.detach().item()
-                test_acc += get_accuracy(outputs, targets, len(labels))
-            loss_test_history.extend([test_loss/(i+1)])
-            accuracy_history.extend([test_acc])
+                    model.setup()
+
+                    # Warmup
+                    warmup = torch.zeros([inputs.shape[0], 15, 24, 64], device=device) + 0.5
+                    states = model.init(inputs.shape[0])
+                    _, states = model(warmup, states)
+
+                    outputs, states = model(inputs, states)
+                    # reset hidden states
+                    # states = model.init(BATCH_SIZE)
+
+                    placeholder = criterion(outputs, targets)
+                    test_loss += placeholder.detach().item()
+                    test_acc += get_accuracy(outputs, targets, len(labels))
+                    eval += 1
+                sample += 1
+            loss_test_history.extend([test_loss/(eval)])
+            accuracy_history.extend([test_acc/eval])
         epoch += 1
 
-        print('Test Loss: %.4f | Test Accuracy: %.2f%% | Time: %i secs' % (test_loss / (i+1), test_acc/(i+1), time.time()-start))
-        torch.save(model.state_dict(),'B-CONV-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
+        print('Test Loss: %.4f | Test Accuracy: %.2f%% | Time: %i secs' % (test_loss / (eval), test_acc/(eval), time.time()-start))
+        torch.save(model.state_dict(),'TOY-CHECKPT-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.pt')
 
         save_data = {'loss': loss_history, 'lossTest': loss_test_history, 'accuracy': accuracy_history}
-        pickle.dump(save_data, open('B-CONV-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
+        pickle.dump(save_data, open('TOY-LOSS-'+datetime.now().strftime('%Y-%m-%d-%H-%M-%S')+'.p', 'wb'))
 
     plt.figure()
-    plt.subplot(2,1,1)
+    plt.subplot(3,1,1)
     plt.plot(loss_history)
     plt.title('Training Loss')
-    plt.subplot(2,1,2)
+    plt.subplot(3,1,2)
     plt.plot(loss_test_history)
     plt.title('Test Loss')
+    plt.subplot(3,1,3)
+    plt.plot(accuracy_history)
+    plt.title('Test Accuracy')
     plt.xlabel('Epoch')
-    plt.legend()
+    # plt.legend()
 plt.show()
