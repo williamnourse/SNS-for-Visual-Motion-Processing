@@ -1763,14 +1763,10 @@ class VisionNet_1F(nn.Module):
             'biasDF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'biasSF': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'biasOff': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
-            'conductanceOnCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
-            'conductanceOnCCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
-            'conductanceOffCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
-            'conductanceOffCCW': nn.Parameter((1/shape_emd_flat)*torch.rand(shape_emd_flat, dtype=dtype, generator=generator).to(device)),
-            'reversalSignOnCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)-0.5),
-            'reversalSignOnCCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)-0.5),
-            'reversalSignOffCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)-0.5),
-            'reversalSignOffCCW': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)-0.5),
+            'conductanceOnEx': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceOnIn': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceOffEx': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
+            'conductanceOffIn': nn.Parameter((1/shape_emd_flat)*torch.rand(1, dtype=dtype, generator=generator).to(device)),
             'ratioTauHorizontal': nn.Parameter(torch.rand(1, dtype=dtype, generator=generator).to(device)),
         })
         if params is not None:
@@ -2602,11 +2598,11 @@ class VisionNet_1F(nn.Module):
             'tau': nn.Parameter(
                 (tau_off_ccw + torch.zeros(self.shape_emd, dtype=self.dtype, device=self.device)).to(
                     self.device),
-                requires_grad=False),
+                requires_grad=True),
             'leak': nn.Parameter(torch.ones(self.shape_emd, dtype=self.dtype).to(self.device), requires_grad=False),
             'rest': nn.Parameter(torch.zeros(self.shape_emd, dtype=self.dtype).to(self.device), requires_grad=False),
             'bias': nn.Parameter(self.params['biasOff'] + torch.zeros(self.shape_emd, dtype=self.dtype).to(self.device),
-                                 requires_grad=False),
+                                 requires_grad=True),
             'init': nn.Parameter(torch.zeros(self.shape_emd, dtype=self.dtype).to(self.device), requires_grad=False),
         })
         self.ccw_off.params.update(nrn_ccw_off_params)
@@ -2614,7 +2610,7 @@ class VisionNet_1F(nn.Module):
         # CW Off Neuron
         syn_ef_cw_off_params = nn.ParameterDict({
             'conductance': nn.Parameter(torch.tensor([[0, 0, 0], [0, 0, self.params['conductanceEFOff']], [0, 0, 0]],
-                                                     dtype=self.dtype, device=self.device), requires_grad=False),
+                                                     dtype=self.dtype, device=self.device), requires_grad=True),
             'reversal': nn.Parameter(torch.tensor([[0, 0, 0], [0, 0, self.params['reversalEx']], [0, 0, 0]],
                                                   dtype=self.dtype, device=self.device), requires_grad=False),
         })
@@ -2623,7 +2619,7 @@ class VisionNet_1F(nn.Module):
         syn_sf_cw_off_params = nn.ParameterDict({
             'conductance': nn.Parameter(torch.tensor([[0, 0, 0], [self.params['conductanceSFOff'], 0, 0],
                                                       [0, 0, 0]],
-                                                     dtype=self.dtype, device=self.device), requires_grad=False),
+                                                     dtype=self.dtype, device=self.device), requires_grad=True),
             'reversal': nn.Parameter(torch.tensor([[0, 0, 0], [self.params['reversalIn'], 0, 0], [0, 0, 0]],
                                                   dtype=self.dtype, device=self.device), requires_grad=False),
         })
@@ -2634,11 +2630,11 @@ class VisionNet_1F(nn.Module):
             'tau': nn.Parameter(
                 (tau_off_cw + torch.zeros(self.shape_emd, dtype=self.dtype, device=self.device)).to(
                     self.device),
-                requires_grad=False),
+                requires_grad=True),
             'leak': nn.Parameter(torch.ones(self.shape_emd, dtype=self.dtype).to(self.device), requires_grad=False),
             'rest': nn.Parameter(torch.zeros(self.shape_emd, dtype=self.dtype).to(self.device), requires_grad=False),
             'bias': nn.Parameter(self.params['biasOff'] + torch.zeros(self.shape_emd, dtype=self.dtype).to(self.device),
-                                 requires_grad=False),
+                                 requires_grad=True),
             'init': nn.Parameter(torch.zeros(self.shape_emd, dtype=self.dtype).to(self.device), requires_grad=False),
         })
         self.cw_off.params.update(nrn_cw_off_params)
@@ -2648,7 +2644,7 @@ class VisionNet_1F(nn.Module):
         tau_hc = self.params['ratioTauHorizontal'] * self.tau_fast
         nrn_hc_params = nn.ParameterDict({
             'tau': nn.Parameter((tau_hc + torch.zeros([2], dtype=self.dtype, device=self.device)).to(self.device),
-                                requires_grad=False),
+                                requires_grad=True),
             'leak': nn.Parameter(torch.ones([2], dtype=self.dtype).to(self.device), requires_grad=False),
             'rest': nn.Parameter(torch.zeros([2], dtype=self.dtype).to(self.device), requires_grad=False),
             'bias': nn.Parameter(torch.zeros([2], dtype=self.dtype).to(self.device), requires_grad=False),
@@ -2656,51 +2652,42 @@ class VisionNet_1F(nn.Module):
         })
         self.hc.params.update(nrn_hc_params)
 
-        g_on_cw = torch.clamp(self.params['conductanceOnCW'], min=0.0)
-        g_on_ccw = torch.clamp(self.params['conductanceOnCCW'], min=0.0)
-        g_off_cw = torch.clamp(self.params['conductanceOffCW'], min=0.0)
-        g_off_ccw = torch.clamp(self.params['conductanceOffCCW'], min=0.0)
+        g_on_ex = torch.clamp(self.params['conductanceOnEx'], min=0.0)
+        g_on_in = torch.clamp(self.params['conductanceOnIn'], min=0.0)
+        g_off_ex = torch.clamp(self.params['conductanceOffEx'], min=0.0)
+        g_off_in = torch.clamp(self.params['conductanceOffIn'], min=0.0)
 
-        g_on_cw_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_on_cw
-        g_on_ccw_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_on_ccw
-        g_off_cw_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_off_cw
-        g_off_ccw_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_off_ccw
+        g_on_ex_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_on_ex
+        g_on_in_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_on_in
+        g_off_ex_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_off_ex
+        g_off_in_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) + g_off_in
 
-        # g_ex_tensor[:,(int(self.shape_emd[1] / 2) - 3):(int(self.shape_emd[1] / 2) + 3)] = 0.0
-        # g_in_tensor[:,(int(self.shape_emd[1] / 2) - 3):(int(self.shape_emd[1] / 2) + 3)] = 0.0
-        # g_ex_tensor = g_ex_tensor.flatten()
-        # g_in_tensor = g_in_tensor.flatten()
-        reversal_on_cw = (torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) +
-                          torch.clamp(10*torch.sign(self.params['reversalSignOnCW']), min=self.params['reversalIn'], max=self.params['reversalEx']))
-        reversal_on_ccw = (torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) +
-                           torch.clamp(10*torch.sign(self.params['reversalSignOnCCW']), min=self.params['reversalIn'], max=self.params['reversalEx']))
-        reversal_off_cw = (torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) +
-                           torch.clamp(10*torch.sign(self.params['reversalSignOffCW']), min=self.params['reversalIn'], max=self.params['reversalEx']))
-        reversal_off_ccw = (torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) +
-                            torch.clamp(10*torch.sign(self.params['reversalSignOffCCW']), min=self.params['reversalIn'], max=self.params['reversalEx']))
+        reversal_in_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) +self.params['reversalIn']
+        reversal_ex_tensor = torch.zeros(flat_shape_emd, dtype=self.dtype, device=self.device) +self.params['reversalEx']
 
 
-        # Horizontal Cells
+        # Horizontal Cells [CCW, CW]
         syn_on_cw_hc_params = nn.ParameterDict({
-            'conductance': nn.Parameter(torch.vstack((g_on_cw_tensor, g_on_ccw_tensor)).to(self.device), requires_grad=False),
-            'reversal': nn.Parameter(torch.vstack((reversal_on_cw, reversal_on_ccw)).to(self.device),
+            'conductance': nn.Parameter(torch.vstack((g_on_in_tensor, g_on_ex_tensor)).to(self.device), requires_grad=True),
+            'reversal': nn.Parameter(torch.vstack((reversal_in_tensor, reversal_ex_tensor)).to(self.device),
                                      requires_grad=False)
         })
+
         syn_on_ccw_hc_params = nn.ParameterDict({
-            'conductance': nn.Parameter(torch.vstack((g_on_ccw_tensor, g_on_cw_tensor)).to(self.device), requires_grad=False),
-            'reversal': nn.Parameter(torch.vstack((reversal_on_ccw, reversal_on_cw)).to(self.device),
+            'conductance': nn.Parameter(torch.vstack((g_on_ex_tensor, g_on_in_tensor)).to(self.device), requires_grad=True),
+            'reversal': nn.Parameter(torch.vstack((reversal_ex_tensor, reversal_in_tensor)).to(self.device),
                                      requires_grad=False)
         })
         syn_off_cw_hc_params = nn.ParameterDict({
-            'conductance': nn.Parameter(torch.vstack((g_off_cw_tensor, g_off_ccw_tensor)).to(self.device),
-                                        requires_grad=False),
-            'reversal': nn.Parameter(torch.vstack((reversal_off_cw, reversal_off_ccw)).to(self.device),
+            'conductance': nn.Parameter(torch.vstack((g_off_in_tensor, g_off_ex_tensor)).to(self.device),
+                                        requires_grad=True),
+            'reversal': nn.Parameter(torch.vstack((reversal_in_tensor, reversal_ex_tensor)).to(self.device),
                                      requires_grad=False)
         })
         syn_off_ccw_hc_params = nn.ParameterDict({
-            'conductance': nn.Parameter(torch.vstack((g_off_ccw_tensor, g_off_cw_tensor)).to(self.device),
-                                        requires_grad=False),
-            'reversal': nn.Parameter(torch.vstack((reversal_off_ccw, reversal_off_cw)).to(self.device),
+            'conductance': nn.Parameter(torch.vstack((g_off_ex_tensor, g_off_in_tensor)).to(self.device),
+                                        requires_grad=True),
+            'reversal': nn.Parameter(torch.vstack((reversal_ex_tensor, reversal_in_tensor)).to(self.device),
                                      requires_grad=False)
         })
         self.syn_on_cw.params.update(syn_on_cw_hc_params)
@@ -4868,6 +4855,9 @@ class NetHandler(nn.Module):
 
         self.batch_size = X.size(1)
         self.n_steps = X.size(0)
+        self.n_substeps = 13
+        output = torch.zeros_like(states[-1])
+        total_steps = self.n_substeps*self.n_steps
 
         # rnn_out => n_steps, batch_size, n_neurons (hidden states for each time step)
         # self.hidden => 1, batch_size, n_neurons (final state from each rnn_out)
@@ -4878,13 +4868,15 @@ class NetHandler(nn.Module):
         #     states = self.net(X[0, :, :, :], states)
         #     step += 1
         for i in range(self.n_steps):
-            states = self.net(X[i,:,:, :], states)
-            # running_ccw += states[-1][:,1]
-            # running_cw += states[-1][:, 0]
-            # print(ext+prev)
+            for j in range(self.n_substeps):
+                states = self.net(X[i,:,:, :], states)
+                output = output + states[-1]/total_steps
+                # running_ccw += states[-1][:,1]
+                # running_cw += states[-1][:, 0]
+                # print(ext+prev)
 
         # print(out)
-        return torch.clamp(states[-1], min=0)
+        return output, states
         # return running_ccw/i, running_cw/i  # batch_size X n_output
 
 class NetHandlerWt(nn.Module):

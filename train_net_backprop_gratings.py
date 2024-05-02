@@ -7,8 +7,8 @@ from torch.nn.functional import mse_loss
 from torch.utils.data import DataLoader
 # import pandas as pd
 import argparse
-# from motion_vision_net import VisionNet_1F, NetHandler, VisionNet_1F_FB, VisionNet_3F, NetHandlerWt
-from motion_vision_net_v2 import NetHandler, VisionNetv2
+from motion_vision_net import VisionNet_1F, NetHandler, VisionNet_1F_FB, VisionNet_3F, NetHandlerWt
+# from motion_vision_net_v2 import NetHandler, VisionNetv2
 from motion_data import ClipDataset
 from datetime import datetime
 import time
@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 start = time.time()
 N_STEPS = 30
-BATCH_SIZE = 8
+BATCH_SIZE = 1
 STEP_INTERVAL = 1
 N_EPOCHS = 500
 N_WARMUP = 15 #*13
@@ -45,7 +45,7 @@ dataset = ClipDataset('/home/will/flywheel-rotation-dataset/Gratings')
 dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 for r in range(N_SEEDS):
-    model = NetHandler(VisionNetv2, IMG_SIZE, N_LAMINA, N_MEDULLA, N_LOBULA, FIELD_SIZE, device=device).to(device)
+    model = NetHandler(VisionNet_1F, DT, IMG_SIZE, FIELD_SIZE, device=device).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=0.001)
 
