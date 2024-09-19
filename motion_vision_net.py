@@ -4874,34 +4874,58 @@ class NetHandler(nn.Module):
         # while step < 400:
         #     states = self.net(X[0, :, :, :], states)
         #     step += 1
-        data = torch.zeros([22, total_steps], device=self.net.device)
+
+        data_retina = torch.zeros([total_steps, len(states[0].flatten())], device=self.net.device)
+        data_bo_inpt = torch.zeros([total_steps, len(states[1].flatten())], device=self.net.device)
+        data_bo_fast = torch.zeros([total_steps, len(states[2].flatten())], device=self.net.device)
+        data_bo_slow = torch.zeros([total_steps, len(states[3].flatten())], device=self.net.device)
+        data_bo_outp = torch.zeros([total_steps, len(states[4].flatten())], device=self.net.device)
+        data_lowpass = torch.zeros([total_steps, len(states[5].flatten())], device=self.net.device)
+        data_bf_inpt = torch.zeros([total_steps, len(states[6].flatten())], device=self.net.device)
+        data_bf_fast = torch.zeros([total_steps, len(states[7].flatten())], device=self.net.device)
+        data_bf_slow = torch.zeros([total_steps, len(states[8].flatten())], device=self.net.device)
+        data_bf_outp = torch.zeros([total_steps, len(states[9].flatten())], device=self.net.device)
+        data_enh_on = torch.zeros([total_steps, len(states[10].flatten())], device=self.net.device)
+        data_dir_on = torch.zeros([total_steps, len(states[11].flatten())], device=self.net.device)
+        data_sup_on = torch.zeros([total_steps, len(states[12].flatten())], device=self.net.device)
+        data_enh_off = torch.zeros([total_steps, len(states[13].flatten())], device=self.net.device)
+        data_dir_off = torch.zeros([total_steps, len(states[14].flatten())], device=self.net.device)
+        data_sup_off = torch.zeros([total_steps, len(states[15].flatten())], device=self.net.device)
+        data_ccw_o = torch.zeros([total_steps, len(states[16].flatten())], device=self.net.device)
+        data_cw_on = torch.zeros([total_steps, len(states[17].flatten())], device=self.net.device)
+        data_ccw_f = torch.zeros([total_steps, len(states[18].flatten())], device=self.net.device)
+        data_cw_of = torch.zeros([total_steps, len(states[19].flatten())], device=self.net.device)
+        data_hc = torch.zeros([total_steps, 2], device=self.net.device)
+
+        data = [data_retina, data_bo_inpt, data_bo_fast, data_bo_slow, data_bo_outp, data_lowpass, data_bf_inpt,
+                data_bf_fast, data_bf_slow, data_bf_outp, data_enh_on, data_dir_on, data_sup_on, data_enh_off,
+                data_dir_off, data_sup_off, data_ccw_o, data_cw_on, data_ccw_f, data_cw_of, data_hc]
         step = 0
         for i in range(self.n_steps):
             for j in range(self.n_substeps):
                 states = self.net(X[i,:,:, :], states)
                 output = output + states[-1]/total_steps
-                data[0 ,step] = states[0 ][0,10,10]
-                data[1 ,step] = states[1 ][0,10,10]
-                data[2 ,step] = states[2 ][0,10,10]
-                data[3 ,step] = states[3 ][0,10,10]
-                data[4 ,step] = states[4 ][0,10,10]
-                data[5 ,step] = states[5 ][0,10,10]
-                data[6 ,step] = states[6 ][0,10,10]
-                data[7 ,step] = states[7 ][0,10,10]
-                data[8 ,step] = states[8 ][0,10,10]
-                data[9 ,step] = states[9 ][0,10,10]
-                data[10,step] = states[10][0,10,10]
-                data[11,step] = states[11][0,10,10]
-                data[12,step] = states[12][0,10,10]
-                data[13,step] = states[13][0,10,10]
-                data[14,step] = states[14][0,10,10]
-                data[15,step] = states[15][0,10,10]
-                data[16,step] = states[16][0,10,10]
-                data[17,step] = states[17][0,10,10]
-                data[18,step] = states[18][0,10,10]
-                data[19,step] = states[19][0,10,10]
-                data[20,step] = states[20][0,0]
-                data[21,step] = states[20][0,1]
+                data[0 ][step, :] = states[0 ].flatten()
+                data[1 ][step, :] = states[1 ].flatten()
+                data[2 ][step, :] = states[2 ].flatten()
+                data[3 ][step, :] = states[3 ].flatten()
+                data[4 ][step, :] = states[4 ].flatten()
+                data[5 ][step, :] = states[5 ].flatten()
+                data[6 ][step, :] = states[6 ].flatten()
+                data[7 ][step, :] = states[7 ].flatten()
+                data[8 ][step, :] = states[8 ].flatten()
+                data[9 ][step, :] = states[9 ].flatten()
+                data[10][step, :] = states[10].flatten()
+                data[11][step, :] = states[11].flatten()
+                data[12][step, :] = states[12].flatten()
+                data[13][step, :] = states[13].flatten()
+                data[14][step, :] = states[14].flatten()
+                data[15][step, :] = states[15].flatten()
+                data[16][step, :] = states[16].flatten()
+                data[17][step, :] = states[17].flatten()
+                data[18][step, :] = states[18].flatten()
+                data[19][step, :] = states[19].flatten()
+                data[20][step, :] = states[20].flatten()
 
                 step += 1
                 # running_ccw += states[-1][:,1]
@@ -4909,7 +4933,7 @@ class NetHandler(nn.Module):
                 # print(ext+prev)
 
         # print(out)
-        return output, states
+        return output, states, data
         # return running_ccw/i, running_cw/i  # batch_size X n_output
 
 class NetHandlerWt(nn.Module):

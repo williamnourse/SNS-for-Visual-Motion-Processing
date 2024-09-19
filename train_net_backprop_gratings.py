@@ -81,12 +81,12 @@ for r in range(N_SEEDS):
                     # Warmup
                     warmup = torch.zeros([inputs.shape[0], 15, 24, 64], device=device) + 0.5
                     states = model.init(inputs.shape[0])
-                    _, states = model(warmup, states)
+                    _, states, _ = model(warmup, states)
                 with torch.enable_grad():
                     # zero the parameter gradients
                     optimizer.zero_grad()
                     model.setup()
-                    outputs, _ = model(inputs, states)
+                    outputs, _, traces = model(inputs, states)
                     # reset hidden states
                     # states = model.init(BATCH_SIZE)
 
@@ -100,6 +100,12 @@ for r in range(N_SEEDS):
                 loss_history.extend([loss.detach().item()])
                 # print(train_running_loss)
                 acc = get_accuracy(outputs, labels, len(labels))
+                if acc == 100.0:
+                    plt.figure()
+                    for d in range(len(traces)):
+                        plt.subplot(5,5,d+1)
+                        plt.imshow(traces[d].detach().cpu(), interpolation='none')
+                    plt.show()
                 train_acc += acc
                 accuracy_history.extend([acc])
                 eval += 1

@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from motion_data import ClipDataset
+import matplotlib.pyplot as plt
 
 class AdaptiveSubnetwork(nn.Module):
     def __init__(self, num, height, width, tau_fastest, params=None, device=None, dtype=torch.float32, generator=None):
@@ -226,3 +227,29 @@ class NetHandler(nn.Module):
 # states = net.net.init(batch_size=6)
 # decoded = net(torch.zeros([6,30,24,64]), states)
 # print(decoded.shape)
+
+# dt = (1/30)/13*1000
+# tau_fastest = dt/(6*dt)
+# params = nn.ParameterDict({
+#             'ratioTauF': 1.0,
+#             'ratioTauS': 0.1,
+#             'alpha': 0.75,
+#         })
+# net = AdaptiveSubnetwork(1,1,1, tau_fastest)
+#
+# state_fast, state_slow = net.init()
+# num_steps = 100
+# fast = torch.zeros(num_steps)
+# slow = torch.zeros(num_steps)
+# for i in range(num_steps):
+#     state_fast, state_slow = net(1,state_fast,state_slow)
+#     fast[i] = state_fast
+#     slow[i] = state_slow
+#
+# plt.figure()
+# plt.plot(fast.detach(), label='F')
+# plt.plot(slow.detach(), label='S')
+# plt.axhline(y=net.params['alpha'].detach(), label='a', color='black')
+# plt.legend()
+#
+# plt.show()
