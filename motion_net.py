@@ -50,7 +50,7 @@ class TraceLayer(nn.Module):
             self.params.update(params)
 
     def forward(self, x, state):
-        state.add_(-self.params['tau'].view(1,self.num_channels, 1, 1) + x)
+        return state - self.params['tau'].view(1,self.num_channels, 1, 1) + x
 
 class LILayer(nn.Module):
     def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
@@ -65,8 +65,28 @@ class LILayer(nn.Module):
             self.params.update(params)
 
     def forward(self, x, state):
-        state.add_(self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state))
-        # return state
+        return state + self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state)
+
+class LI2Layer(nn.Module):
+    def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
+        super().__init__()
+        if device is None:
+            if device is None:
+                device = 'cpu'
+            self.params = nn.ParameterDict({
+                'tau0': nn.Parameter(
+                    torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device)),
+                'tau1': nn.Parameter(
+                    torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device))
+            })
+            self.num_channels = num_channels
+            if params is not None:
+                self.params.update(params)
+
+    def forward(self, x, state_0, state_1):
+        state_0_new = state_0 + self.params['tau0'].view(1,self.num_channels, 1, 1) * (x - state_0)
+        state_1_new = state_1 + self.params['tau1'].view(1,self.num_channels, 1, 1) * (state_0 - state_1)
+        return state_1_new - state_0_new, state_0_new, state_1_new
 
 class ShuntedLILayer(nn.Module):
     def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
@@ -81,8 +101,7 @@ class ShuntedLILayer(nn.Module):
             self.params.update(params)
 
     def forward(self, x, shunt, state):
-        state.add_(self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state * (1 + shunt)))
-        # return state
+        return state + self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state * (1 + shunt))
 
 class MotionNet(nn.Module):
     def __init__(self, event_channels=2, img_channels=2, num_filters_event=6, num_filters_img=2, num_emd=8, kernel_size=5):
@@ -131,41 +150,67 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     with torch.no_grad():
-        height, width = 260, 346
-        # height, width = 480, 640
-
-        example_event_frame = torch.randint(0,3,[1,height,width]) -1.0
-        print(example_event_frame)
-        split_example_frame = process_events(example_event_frame)
-        print(split_example_frame)
-
-        example_img = torch.rand([1,height,width])
-        # print(example_img)
-        split_img = process_images(example_img)
-        # print(split_img)
-        # norm = mpl.colors.Normalize(vmin=0, vmax=1)
-        # plt.figure()
-        # plt.subplot(1,2,1)
-        # plt.imshow(split_img[0,0,:,:], cmap='Greys', norm=norm, interpolation='none')
-        # plt.subplot(1,2,2)
-        # plt.imshow(split_img[0,1,:,:], cmap='Greys', norm=norm, interpolation='none')
-        # plt.show()
-        event_channels = 2
-        img_channels = 2
-        num_filters_event = 6
-        num_filters_img = 2
-        num_emd = 8
-
-        state_trace = torch.rand([1,num_filters_event,height-4,width-4])
-        state_li_e = torch.rand([1,num_filters_event,height-4,width-4])
-        state_li_i = torch.rand([1,num_filters_img,height-4,width-4])
-        state_emd = torch.rand([1,num_emd,height-6,width-6])
-
-        net = MotionNet(event_channels=event_channels, img_channels=img_channels, num_filters_event=num_filters_event, num_filters_img=num_filters_img, num_emd=num_emd, kernel_size=5)
-        num_samples = 1000
-        start = time.time()
-        for i in tqdm(range(num_samples)):
-            state_trace, state_li_e, state_li_i, state_emd = net(split_example_frame, split_img, state_trace, state_li_e, state_li_i, state_emd)
-        end = time.time()
-        print('Finished %i in %i secs'%(num_samples,end-start))
-        print('Avg step time: %.6f'%((end-start)/num_samples))
+        input_low = torch.tensor(0.0)
+        input_high = torch.tensor(1.0)
+        nested = LI2Layer(1)
+        num_steps = 100
+        data0 = torch.zeros(num_steps)
+        data1 = torch.zeros(num_steps)
+        dataOut = torch.zeros(num_steps)
+        state_0 = torch.tensor(0.0)
+        state_1 = torch.tensor(0.0)
+        state_out = torch.tensor(0.0)
+        for i in range(num_steps):
+            if 10 < i < 50:
+                state_out, state_0, state_1 = nested(input_high, state_0, state_1)
+                # if state_out > 0:
+                #     pass
+            else:
+                state_out, state_0, state_1 = nested(input_low, state_0, state_1)
+            data0[i] = state_0
+            data1[i] = state_1
+            dataOut[i] = state_out
+        plt.figure()
+        plt.plot(data0)
+        plt.plot(data1)
+        plt.plot(dataOut)
+        plt.show()
+    #
+    #     height, width = 260, 346
+    #     # height, width = 480, 640
+    #
+    #     example_event_frame = torch.randint(0,3,[1,height,width]) -1.0
+    #     print(example_event_frame)
+    #     split_example_frame = process_events(example_event_frame)
+    #     print(split_example_frame)
+    #
+    #     example_img = torch.rand([1,height,width])
+    #     # print(example_img)
+    #     split_img = process_images(example_img)
+    #     # print(split_img)
+    #     # norm = mpl.colors.Normalize(vmin=0, vmax=1)
+    #     # plt.figure()
+    #     # plt.subplot(1,2,1)
+    #     # plt.imshow(split_img[0,0,:,:], cmap='Greys', norm=norm, interpolation='none')
+    #     # plt.subplot(1,2,2)
+    #     # plt.imshow(split_img[0,1,:,:], cmap='Greys', norm=norm, interpolation='none')
+    #     # plt.show()
+    #     event_channels = 2
+    #     img_channels = 2
+    #     num_filters_event = 6
+    #     num_filters_img = 2
+    #     num_emd = 8
+    #
+    #     state_trace = torch.rand([1,num_filters_event,height-4,width-4])
+    #     state_li_e = torch.rand([1,num_filters_event,height-4,width-4])
+    #     state_li_i = torch.rand([1,num_filters_img,height-4,width-4])
+    #     state_emd = torch.rand([1,num_emd,height-6,width-6])
+    #
+    #     net = MotionNet(event_channels=event_channels, img_channels=img_channels, num_filters_event=num_filters_event, num_filters_img=num_filters_img, num_emd=num_emd, kernel_size=5)
+    #     num_samples = 1000
+    #     start = time.time()
+    #     for i in tqdm(range(num_samples)):
+    #         state_trace, state_li_e, state_li_i, state_emd = net(split_example_frame, split_img, state_trace, state_li_e, state_li_i, state_emd)
+    #     end = time.time()
+    #     print('Finished %i in %i secs'%(num_samples,end-start))
+    #     print('Avg step time: %.6f'%((end-start)/num_samples))
