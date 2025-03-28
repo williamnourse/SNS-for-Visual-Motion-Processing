@@ -3,7 +3,7 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$" />
     <content url="file://$USER_HOME$/flywheel-rotation-dataset" />
-    <orderEntry type="jdk" jdkName="Python 3.8 (vision-venv) (2)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.10 (sns-venv)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="SNSTorch" />
   </component>

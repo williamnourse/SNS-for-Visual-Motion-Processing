@@ -1,43 +1,9 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-def process_events(event_frame: torch.Tensor, merge=True):
-    """
-    Converts an event frame into a split frame, one for positive and one for negative edges
-    :param event_frame: input frame, assuming (batch, height, width) format
-    :param merge: If True, combine into one tensor. If False, output positive and negative channels as separate images
-    :return: split_frame, (batch, 2, height, width), or pos and neg
-    """
-    shape = event_frame.shape
-    if merge:
-        split_frame = torch.zeros([shape[0],2,shape[1], shape[2]])
-        split_frame[:,0,:,:] = event_frame
-        split_frame[:,1,:,:] = -event_frame
-        nn.functional.relu(split_frame, inplace=True)
-        return split_frame
-    else:
-        pos = nn.functional.relu(event_frame)
-        neg = nn.functional.relu(-event_frame)
-        return pos, neg
 
-def process_images(img_frame: torch.Tensor, merge=True):
-    """
-    Converts an event frame into a split frame, one for positive and one for negative edges
-    :param img_frame: input frame, assuming (batch, height, width) format
-    :param merge: If True, combine into one tensor. If False, output original and inverted channels as separate images
-    :return: split_frame, (batch, 2, height, width), or original and inverted
-    """
-    shape = img_frame.shape
-    if merge:
-        split_frame = torch.zeros([shape[0],2,shape[1], shape[2]])
-        split_frame[:,0,:,:] = img_frame
-        split_frame[:,1,:,:] = 1 - img_frame
-        return split_frame
-    else:
-        inv_frame = 1 - img_frame
-        return img_frame, inv_frame
-
-class TraceLayer(nn.Module):
+class LI(nn.Module):
     def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
         super().__init__()
         if device is None:
@@ -48,26 +14,14 @@ class TraceLayer(nn.Module):
         self.num_channels = num_channels
         if params is not None:
             self.params.update(params)
+        self.clamp = nn.Hardtanh(min_val=0, max_val=1)
 
     def forward(self, x, state):
-        return state - self.params['tau'].view(1,self.num_channels, 1, 1) + x
+        state_new = state + self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state)
+        return self.clamp(state_new), state_new
 
-class LILayer(nn.Module):
-    def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
-        super().__init__()
-        if device is None:
-            device = 'cpu'
-        self.params = nn.ParameterDict({
-            'tau': nn.Parameter(torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device))
-        })
-        self.num_channels = num_channels
-        if params is not None:
-            self.params.update(params)
 
-    def forward(self, x, state):
-        return state + self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state)
-
-class LI2Layer(nn.Module):
+class LI2(nn.Module):
     def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
         super().__init__()
         if device is None:
@@ -77,70 +31,109 @@ class LI2Layer(nn.Module):
                 'tau0': nn.Parameter(
                     torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device)),
                 'tau1': nn.Parameter(
-                    torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device))
+                    torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device)),
+                'bias': nn.Parameter(
+                    torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device)),
+                'gate0': nn.Parameter(
+                    torch.randn(num_channels, device=device, dtype=dtype, generator=generator).to(device)),
+                'gate1': nn.Parameter(
+                    torch.randn(num_channels, device=device, dtype=dtype, generator=generator).to(device)),
             })
             self.num_channels = num_channels
             if params is not None:
                 self.params.update(params)
+            self.clamp = nn.Hardtanh(min_val=0, max_val=1)
 
     def forward(self, x, state_0, state_1):
-        state_0_new = state_0 + self.params['tau0'].view(1,self.num_channels, 1, 1) * (x - state_0)
-        state_1_new = state_1 + self.params['tau1'].view(1,self.num_channels, 1, 1) * (state_0 - state_1)
-        return state_1_new - state_0_new, state_0_new, state_1_new
+        state_0_new = state_0 + self.params['tau0'].view(1, self.num_channels, 1, 1) * (x - state_0)
+        state_1_new = state_1 + self.params['tau1'].view(1, self.num_channels, 1, 1) * (state_0 - state_1)
+        out = state_0_new * self.params['gate0'].view(1, self.num_channels, 1, 1) +\
+              state_1_new * self.params['gate1'].view(1, self.num_channels, 1, 1) +\
+              self.params['bias'].view(1, self.num_channels, 1, 1)
+        # out = state_0_new * self.params['gate0'] + state_1_new * self.params['gate1'] + self.params['bias']
+        return self.clamp(out), state_0_new, state_1_new
 
-class ShuntedLILayer(nn.Module):
-    def __init__(self, num_channels, params=None, device=None, dtype=torch.float32, generator=None):
-        super().__init__()
-        if device is None:
-            device = 'cpu'
-        self.params = nn.ParameterDict({
-            'tau': nn.Parameter(torch.rand(num_channels, device=device, dtype=dtype, generator=generator).to(device))
-        })
-        self.num_channels = num_channels
-        if params is not None:
-            self.params.update(params)
-
-    def forward(self, x, shunt, state):
-        return state + self.params['tau'].view(1,self.num_channels, 1, 1) * (x - state * (1 + shunt))
 
 class MotionNet(nn.Module):
-    def __init__(self, event_channels=2, img_channels=2, num_filters_event=6, num_filters_img=2, num_emd=8, kernel_size=5):
+    def __init__(self, input_channels=1, num_filters_0=2, num_filters_1=4, num_emd=4, kernel_size=3):
         super().__init__()
-        # Event pathway
-        self.conv_e = nn.Conv2d(event_channels, num_filters_event, kernel_size=kernel_size)
-        self.trace = TraceLayer(num_filters_event)
-        self.li_e = LILayer(num_filters_event)
-        self.clip_e = nn.Hardtanh(min_val=0, max_val=1)
+        # Layer 0 (Lamina)
+        self.conv_0 = nn.Conv2d(input_channels, num_filters_0, kernel_size=kernel_size)
+        self.li2_0 = LI2(num_channels=num_filters_0)
 
-        # Frame pathway
-        self.conv_i = nn.Conv2d(img_channels, num_filters_img, kernel_size=kernel_size)
-        self.li_i = LILayer(num_filters_img)
-        self.clip_i = nn.Hardtanh(min_val=0, max_val=1)
+        # Layer 1 (Medulla)
+        self.conv_1 = nn.Conv2d(num_filters_0, num_filters_1, kernel_size=kernel_size)
+        self.li_1 = LI(num_channels=num_filters_1)
 
-        # EMDs
-        self.conv_emd = nn.Conv2d(num_filters_event, num_emd, kernel_size=3)
-        self.conv_emd_img = nn.Conv2d(num_filters_img, num_emd, kernel_size=3)
-        self.emd = ShuntedLILayer(num_emd)
+        # EMDs (Lobula/Lopula Plate)
+        self.conv_emd = nn.Conv2d(num_filters_1, num_emd, kernel_size=3)
+        self.conv_shunt = nn.Conv2d(num_filters_1, num_emd, kernel_size=3)
+        self.emd = LI(num_emd)
 
-    def forward(self, event_frame, img, state_trace, state_li_e, state_li_i, state_emd):
-        # Events
-        conv_e = self.conv_e(event_frame)
-        self.trace(conv_e, state_trace)
-        self.li_e(state_trace, state_li_e)
-        out_e = self.clip_e(state_li_e)
+    def forward(self, x, state_0_0, state_0_1, state_1, state_emd):
+        # Layer 0 (Lamina)
+        x = self.conv_0(x)
+        x, state_0_0, state_0_1 = self.li2_0(x, state_0_0, state_0_1)
 
-        # Image frames
-        conv_i = self.conv_i(img)
-        self.li_i(conv_i, state_li_i)
-        out_i = self.clip_i(state_li_i)
+        # Layer 1 (Medulla)
+        x = self.conv_1(x)
+        x, state_1 = self.li_1(x, state_1)
 
-        # EMD
-        direct = self.conv_emd(out_e)
-        shunt = self.conv_emd_img(out_i)
-        self.emd(direct, shunt, state_emd)
+        # EMD (Lobula/Lobula Plate)
+        direct = self.conv_emd(x)
+        shunt = self.conv_shunt(x)
+        x = direct + shunt*(-state_emd)
+        x, state_emd = self.emd(x, state_emd)
         # print(state_emd[0,0,0,0])
 
-        return state_trace, state_li_e, state_li_i, state_emd
+        return x, state_0_0, state_0_1, state_1, state_emd
+
+
+def angular_field_loss(output, target_vectors):
+    """
+    Computes the cosine similarity loss between the resultant vector field
+    (from cardinal directions) and a per-input target vector.
+
+    Args:
+    - output: Tensor of shape [b, 4, h, w] -> predicted cardinal direction magnitudes:
+        - 0: up (+y)
+        - 1: down (-y)
+        - 2: left (-x)
+        - 3: right (+x)
+    - target_vectors: Tensor of shape [b, 2] -> per-input target vectors
+
+    Returns:
+    - loss: Scalar cosine similarity loss
+    """
+    b, _, h, w = output.shape
+
+    # 1. Generate the resultant vector field
+    up = output[:, 0, :, :]
+    down = output[:, 1, :, :]
+    left = output[:, 2, :, :]
+    right = output[:, 3, :, :]
+
+    # Compute the resultant x and y components
+    x = right - left  # Horizontal component
+    y = up - down     # Vertical component
+
+    # Stack to form the resultant vector field [b, 2, h, w]
+    resultant_field = torch.stack((x, y), dim=1)
+
+    # 2. Normalize the target vectors and expand to match spatial dimensions
+    # target_vectors = F.normalize(target_vectors[:, :, None, None], dim=1)  # [b, 2, 1, 1]
+    target_vectors = target_vectors[:,:,None,None]
+
+    # 3. Normalize the resultant field for cosine similarity calculation
+    norm_resultant = F.normalize(resultant_field, dim=1)
+
+    # 4. Cosine similarity calculation
+    cos_sim = torch.sum(norm_resultant * target_vectors, dim=1)  # Shape: [b, h, w]
+
+    # 5. Loss calculation (1 - mean similarity)
+    loss = 1 - cos_sim.mean()
+
+    return loss
 
 
 if __name__ == "__main__":
@@ -149,68 +142,50 @@ if __name__ == "__main__":
     import time
     from tqdm import tqdm
 
-    with torch.no_grad():
-        input_low = torch.tensor(0.0)
-        input_high = torch.tensor(1.0)
-        nested = LI2Layer(1)
-        num_steps = 100
-        data0 = torch.zeros(num_steps)
-        data1 = torch.zeros(num_steps)
-        dataOut = torch.zeros(num_steps)
-        state_0 = torch.tensor(0.0)
-        state_1 = torch.tensor(0.0)
-        state_out = torch.tensor(0.0)
-        for i in range(num_steps):
-            if 10 < i < 50:
-                state_out, state_0, state_1 = nested(input_high, state_0, state_1)
-                # if state_out > 0:
-                #     pass
-            else:
-                state_out, state_0, state_1 = nested(input_low, state_0, state_1)
-            data0[i] = state_0
-            data1[i] = state_1
-            dataOut[i] = state_out
-        plt.figure()
-        plt.plot(data0)
-        plt.plot(data1)
-        plt.plot(dataOut)
-        plt.show()
-    #
-    #     height, width = 260, 346
-    #     # height, width = 480, 640
-    #
-    #     example_event_frame = torch.randint(0,3,[1,height,width]) -1.0
-    #     print(example_event_frame)
-    #     split_example_frame = process_events(example_event_frame)
-    #     print(split_example_frame)
-    #
-    #     example_img = torch.rand([1,height,width])
-    #     # print(example_img)
-    #     split_img = process_images(example_img)
-    #     # print(split_img)
-    #     # norm = mpl.colors.Normalize(vmin=0, vmax=1)
-    #     # plt.figure()
-    #     # plt.subplot(1,2,1)
-    #     # plt.imshow(split_img[0,0,:,:], cmap='Greys', norm=norm, interpolation='none')
-    #     # plt.subplot(1,2,2)
-    #     # plt.imshow(split_img[0,1,:,:], cmap='Greys', norm=norm, interpolation='none')
-    #     # plt.show()
-    #     event_channels = 2
-    #     img_channels = 2
-    #     num_filters_event = 6
-    #     num_filters_img = 2
-    #     num_emd = 8
-    #
-    #     state_trace = torch.rand([1,num_filters_event,height-4,width-4])
-    #     state_li_e = torch.rand([1,num_filters_event,height-4,width-4])
-    #     state_li_i = torch.rand([1,num_filters_img,height-4,width-4])
-    #     state_emd = torch.rand([1,num_emd,height-6,width-6])
-    #
-    #     net = MotionNet(event_channels=event_channels, img_channels=img_channels, num_filters_event=num_filters_event, num_filters_img=num_filters_img, num_emd=num_emd, kernel_size=5)
-    #     num_samples = 1000
-    #     start = time.time()
-    #     for i in tqdm(range(num_samples)):
-    #         state_trace, state_li_e, state_li_i, state_emd = net(split_example_frame, split_img, state_trace, state_li_e, state_li_i, state_emd)
-    #     end = time.time()
-    #     print('Finished %i in %i secs'%(num_samples,end-start))
-    #     print('Avg step time: %.6f'%((end-start)/num_samples))
+    test_network = False
+    test_loss = True
+    if test_network:
+        with torch.no_grad():
+            height, width = 32, 34
+            num_filters_0 = 2
+            num_filters_1 = 4
+            num_emd = 4
+            kernel_size=3
+            num_steps = 10000
+
+            example_img = torch.rand([1, height, width])
+
+            net = MotionNet(num_filters_0=num_filters_0, num_filters_1=num_filters_1, num_emd=num_emd,
+                            kernel_size=kernel_size)
+
+            norm = mpl.colors.Normalize(vmin=0, vmax=1)
+            plt.figure()
+            plt.imshow(example_img[0,:,:], cmap='Greys_r', norm=norm, interpolation='none')
+            plt.colorbar()
+
+            state_0_0 = torch.zeros(1, num_filters_0, height-kernel_size+1, width-kernel_size+1)
+            state_0_1 = torch.zeros(1, num_filters_0, height-kernel_size+1, width-kernel_size+1)
+            state_1 = torch.zeros(1, num_filters_1, height-kernel_size-1, width-kernel_size-1)
+            state_emd = torch.zeros(1, num_emd, height-kernel_size-3, width-kernel_size-3)
+
+            start = time.time()
+            for i in tqdm(range(num_steps)):
+                out, state_0_0, state_0_1, state_1, state_emd = net(example_img, state_0_0, state_0_1, state_1, state_emd)
+            end = time.time()
+            print('Avg step: %.4f secs'%((end-start)/num_steps))
+
+            plt.show()
+
+    if test_loss:
+        b = 4
+        targets = torch.tensor([[1.0,0.0],
+                                [0.0,1.0],
+                                [-1.0,0.0],
+                                [0.0,-1.0]])
+        data = torch.tensor([[0.0,0.0,0.0,1.0],
+                             [1.0,0.0,0.0,1.0],
+                             [0.0,0.0,1.0,0.0],
+                             [0.0,1.0,0.0,0.0]])
+        data = data.reshape(4,4,1,1)
+        loss = angular_field_loss(data,targets)
+        print(loss)
