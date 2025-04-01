@@ -88,56 +88,6 @@ class MotionNet(nn.Module):
 
         return x, state_0_0, state_0_1, state_1, state_emd
 
-def cartesian_to_flo(output):
-    # 1. Generate the resultant vector field
-    up = output[:, 0, :, :]
-    down = output[:, 1, :, :]
-    left = output[:, 2, :, :]
-    right = output[:, 3, :, :]
-
-    # Compute the resultant x and y components
-    x = right - left  # Horizontal component
-    y = up - down  # Vertical component
-
-    # Stack to form the resultant vector field [b, 2, h, w]
-    resultant_field = torch.stack((x, y), dim=1)
-    return resultant_field
-
-def angular_field_loss(output, target_vectors):
-    """
-    Computes the cosine similarity loss between the resultant vector field
-    (from cardinal directions) and a per-input target vector.
-
-    Args:
-    - output: Tensor of shape [b, 4, h, w] -> predicted cardinal direction magnitudes:
-        - 0: up (+y)
-        - 1: down (-y)
-        - 2: left (-x)
-        - 3: right (+x)
-    - target_vectors: Tensor of shape [b, 2] -> per-input target vectors
-
-    Returns:
-    - loss: Scalar cosine similarity loss
-    """
-    b, _, h, w = output.shape
-
-    resultant_field = cartesian_to_flo(output)
-
-    # 2. Normalize the target vectors and expand to match spatial dimensions
-    # target_vectors = F.normalize(target_vectors[:, :, None, None], dim=1)  # [b, 2, 1, 1]
-    target_vectors = target_vectors[:,:,None,None]
-
-    # 3. Normalize the resultant field for cosine similarity calculation
-    norm_resultant = F.normalize(resultant_field, dim=1)
-
-    # 4. Cosine similarity calculation
-    cos_sim = torch.sum(norm_resultant * target_vectors, dim=1)  # Shape: [b, h, w]
-
-    # 5. Loss calculation (1 - mean similarity)
-    loss = 1 - cos_sim.mean()
-
-    return loss
-
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
