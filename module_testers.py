@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from modules import LI, LI2, angular_field_loss, cartesian_to_flo
+from src.modules import LI, LI2, angular_field_loss, cartesian_to_flo
 from tqdm import trange
 import matplotlib.pyplot as plt
 
