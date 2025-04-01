@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from src.modules import LI, LI2
-from src.functions import angular_field_loss
+from src.functions import angular_field_loss, cardinal_to_xy
 from tqdm import trange
 import matplotlib.pyplot as plt
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         print('Testing angular loss:')
         direction = torch.tensor([[-1,-1]])
         pred_hist, loss_hist = angular_loss_tester(direction)
-        flo_hist = cartesian_to_flo(pred_hist)
+        flo_hist = cardinal_to_xy(pred_hist)
         plt.figure()
         plt.plot(loss_hist)
         plt.figure()

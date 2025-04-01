@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from jaxtyping import Float, Int
 
-def cardinal_to_xy(cardinal_directions: Float[torch.Tensor, "batch, 4, height, width"])\
-    -> Float[torch.Tensor, "batch, 2, height, width"]:
+def cardinal_to_xy(cardinal_directions: Float[torch.Tensor, "batch 4 height width"])\
+    -> Float[torch.Tensor, "batch 2 height width"]:
     """
     Converts the output of cardinal directions to a resultant vector field.
     Args:
@@ -33,8 +33,8 @@ def cardinal_to_xy(cardinal_directions: Float[torch.Tensor, "batch, 4, height, w
     vector_field = torch.stack((x, y), dim=1)
     return vector_field
 
-def angular_field_loss(cardinal_field: Float[torch.Tensor, "batch, 2, height, width"],
-                       target_vectors: Float[torch.Tensor, "batch, 2"]) -> Float[torch.Tensor, "loss"]:
+def angular_field_loss(cardinal_field: Float[torch.Tensor, "batch 2 height width"],
+                       target_vectors: Float[torch.Tensor, "batch 2"]) -> Float[torch.Tensor, "loss"]:
     """
     Computes the cosine similarity loss between a batched vector field and a batched target vector.
 
