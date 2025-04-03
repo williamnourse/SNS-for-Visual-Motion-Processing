@@ -1,0 +1,15 @@
+# Config file for generating a dataset of sinusoidal and square waveforms with grating patterns.
+# April 3, 2025
+
+random_seed: ~ # Random seed for reproducibility
+resolution: [32, 32] # Resolution of the generated images (height, width)
+num_frames: 30 # Number of frames to generate
+framerate: 30 # Frames per second
+
+waveforms: [sin, square] # List of waveform types to generate
+angles: [0, 90, 180, 270] # List of angles for grating patterns
+angle_unit: degrees # Unit for angles (degrees or radians)
+contrast: [1.0] # List of contrast values for the grating patterns (0 no contrast, 1 full contrast)
+wavelengths: [5, 10, 25, 50] # List of wavelengths for the sinusoidal waveforms (in pixels)
+velocities: [10, 50, 100] # List of velocities for the sinusoidal waveforms (in pixels/second)
+phase_offsets: [0.0, 0.25, 0.5, 0.75] # List of phase offsets for the waveforms [0 - 1)
